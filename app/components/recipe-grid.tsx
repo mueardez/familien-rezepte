@@ -2,11 +2,19 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { Recipe } from "../data/recipes";
 
-const methods = ["Alle", "Pfanne", "Topf", "Ofen", "Waffeleisen"] as const;
+type RecipeCard = {
+  slug: string;
+  title: string;
+  time: string;
+  method: string;
+  icon: string;
+  ingredients: readonly string[];
+};
 
-export function RecipeGrid({ recipes }: { recipes: Recipe[] }) {
+const methods = ["Alle", "Pfanne", "Topf", "Ofen", "Waffeleisen", "Petromax"] as const;
+
+export function RecipeGrid({ recipes }: { recipes: readonly RecipeCard[] }) {
   const [query, setQuery] = useState("");
   const [method, setMethod] = useState<(typeof methods)[number]>("Alle");
   const filtered = useMemo(() => {
@@ -21,7 +29,7 @@ export function RecipeGrid({ recipes }: { recipes: Recipe[] }) {
   return (
     <section className="recipe-browser" aria-labelledby="recipe-heading">
       <div className="browser-heading">
-        <div><p className="eyebrow">19 Familienfavoriten</p><h2 id="recipe-heading">Was kochen wir heute?</h2></div>
+        <div><p className="eyebrow">{recipes.length} Familienfavoriten</p><h2 id="recipe-heading">Was kochen wir heute?</h2></div>
         <label className="search-box">
           <span className="sr-only">Rezepte oder Zutaten suchen</span><span aria-hidden="true">⌕</span>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rezept oder Zutat suchen" />
