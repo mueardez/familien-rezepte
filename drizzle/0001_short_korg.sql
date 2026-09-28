@@ -1,0 +1,1 @@
+ALTER TABLE `imported_recipes` ADD `instagram_recipe` integer DEFAULT true NOT NULL;

@@ -1,0 +1,56 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import Image from "next/image";
+import { notFound } from "next/navigation";
+import { BringImport } from "../../components/bring-import";
+import { getRecipe, recipes } from "../../data/recipes";
+import { getImportedRecipe } from "../../lib/imported-recipes";
+import { env } from "cloudflare:workers";
+import { appOrigin } from "../../lib/auth-core";
+
+export const dynamic = "force-dynamic";
+
+async function findRecipe(slug: string) { return getRecipe(slug) ?? await getImportedRecipe(slug); }
+
+export function generateStaticParams() { return recipes.map((recipe) => ({ slug: recipe.slug })); }
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const recipe = await findRecipe(slug);
+  if (!recipe) return {};
+  const description = `${recipe.title}: ${recipe.time}, kindertauglich und weizenfrei. Zutaten direkt in Bring! übernehmen.`;
+  return { title: `${recipe.title} | Familien-Rezepte`, description, openGraph: { title: recipe.title, description, images: [] }, twitter: { card: "summary", title: recipe.title, description, images: [] } };
+}
+
+export default async function RecipePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const recipe = await findRecipe(slug);
+  if (!recipe) notFound();
+  const minutes = recipe.time.match(/\d+/)?.[0] ?? "20";
+  const structuredRecipe = {
+    "@context": "https://schema.org", "@type": "Recipe", name: recipe.title,
+    author: { "@type": "Person", name: "Familien-Rezepte" },
+    description: `Familienrezept: ${recipe.title}.`,
+    prepTime: `PT${minutes}M`, totalTime: `PT${minutes}M`, recipeYield: "3 Portionen",
+    recipeCategory: "Familien-Z’Nacht", recipeCuisine: "Familienküche",
+    keywords: "Familienrezept", recipeIngredient: recipe.ingredients,
+    ...(recipe.imageUrl && env.APP_ORIGIN ? { image: [new URL(recipe.imageUrl, appOrigin(env)).href] } : {}),
+    recipeInstructions: recipe.steps.map((step) => ({ "@type": "HowToStep", text: step })),
+  };
+  return (
+    <main className="recipe-page">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredRecipe).replace(/</g, "\\u003c") }} />
+      <header className="site-header compact"><Link className="brand" href="/"><span aria-hidden="true">🥕</span> Familien-Rezepte</Link><Link className="back-link" href="/">← Alle Rezepte</Link></header>
+      <article itemScope itemType="https://schema.org/Recipe">
+        <section className="recipe-hero"><div><p className="eyebrow">{recipe.time} · {recipe.method}</p><h1 itemProp="name">{recipe.title}</h1><p className="recipe-intro">Ein Rezept aus unserer Familienküche.</p><div className="facts"><span>⏱ {recipe.time}</span><span>🍽 {recipe.servings ?? "3 Portionen"}</span>{recipe.isInstagram && <span>Instagram-Rezept</span>}{!recipe.imageUrl && <span>🌾 Weizenfrei</span>}</div></div>{recipe.imageUrl ? <div className="recipe-photo"><Image src={recipe.imageUrl} alt={`Fertiges Gericht: ${recipe.title}`} fill sizes="240px" priority unoptimized /></div> : <div className="recipe-icon" aria-hidden="true">{recipe.icon}</div>}</section>
+        <section className="recipe-content">
+          <div className="ingredients"><p className="eyebrow">{recipe.servings ?? "Für 2 Erwachsene + 1 Kind"}</p><h2>Zutaten</h2><ul>{recipe.ingredients.map((ingredient, index) => <li itemProp="recipeIngredient" key={`${ingredient}-${index}`}>{ingredient}</li>)}</ul></div>
+          <div className="instructions"><p className="eyebrow">Schritt für Schritt</p><h2>So geht’s</h2><ol>{recipe.steps.map((step, index) => <li itemProp="recipeInstructions" key={step}><span>{index + 1}</span><p>{step}</p></li>)}</ol></div>
+        </section>
+        {!recipe.imageUrl && <div className="kid-tip"><span aria-hidden="true">💡</span><div><strong>Kindertipp</strong><p>{recipe.tip}</p></div></div>}
+        <BringImport />
+      </article>
+      <footer><Link href="/">← Zur Rezeptübersicht</Link><span>Familien-Rezepte</span></footer>
+    </main>
+  );
+}

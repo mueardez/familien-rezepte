@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "familien-rezepte",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "keep_vars": true,
+  "assets": { "binding": "ASSETS" },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "familien-rezepte-db",
+    "database_id": "72c0c0fd-798d-419d-af6a-7b283bef69e2",
+    "migrations_dir": "drizzle"
+  }],
+  "r2_buckets": [{
+    "binding": "BUCKET",
+    "bucket_name": "familien-rezepte-bilder"
+  }]
+}

@@ -1,0 +1,8 @@
+# Copy to .dev.vars only for local development. Never commit actual secrets.
+APP_ORIGIN=https://your-app.your-subdomain.workers.dev
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+SESSION_SECRET=
+RECIPE_ADMIN_EMAIL=
+ALLOWED_EMAILS=
+OPENAI_API_KEY=
