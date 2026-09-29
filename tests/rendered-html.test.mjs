@@ -107,6 +107,32 @@ test("renders the recipe collection and import entry point", async () => {
     delete config.OPENAI_API_KEY;
   }
 
+  // Optional preparation: persist an empty array, including omitted/blank steps.
+  const savedRows = [];
+  config.DB = { prepare: () => ({ bind: (...values) => ({ first: async () => null, run: async () => { savedRows.push(values); } }) }) };
+  config.BUCKET = { put: async () => {}, delete: async () => {} };
+  try {
+    for (const steps of [[], ["  "], undefined, ["Wrap füllen."]]) {
+      const form = new FormData();
+      form.set("dishImage", new File(["test"], "dish.png", { type: "image/png" }));
+      form.set("recipe", JSON.stringify({ ...ingredientsOnly, title: "Ei-Wrap", steps }));
+      const result = await fetchPage("/api/import/save", { method: "POST", body: form, headers: { origin: config.APP_ORIGIN, cookie: `__Host-familien-session=${token}` } });
+      assert.equal(result.status, 200);
+      assert.deepEqual(JSON.parse(savedRows.at(-1)[10]), steps?.filter((item) => item.trim()) ?? []);
+    }
+    for (const invalid of [{ title: "" }, { ingredients: [] }]) {
+      const form = new FormData();
+      form.set("dishImage", new File(["test"], "dish.png", { type: "image/png" }));
+      form.set("recipe", JSON.stringify({ ...ingredientsOnly, title: "Ei-Wrap", ...invalid }));
+      const result = await fetchPage("/api/import/save", { method: "POST", body: form, headers: { origin: config.APP_ORIGIN, cookie: `__Host-familien-session=${token}` } });
+      assert.equal(result.status, 400);
+    }
+    assert.equal(savedRows.length, 4);
+  } finally {
+    delete config.DB;
+    delete config.BUCKET;
+  }
+
   const login = await fetchPage("/auth/google?return_to=%2Frezept-import");
   assert.equal(login.status, 302);
   const google = new URL(login.headers.get("location"));

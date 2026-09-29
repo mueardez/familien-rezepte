@@ -43,7 +43,7 @@ export function RecipeImportForm() {
     if (!draft || !dishImage) return;
     const ingredients = draft.ingredients.map((item) => item.trim()).filter(Boolean);
     const steps = draft.steps.map((item) => item.trim()).filter(Boolean);
-    if (!draft.title.trim() || !ingredients.length || !steps.length) { setError("Titel, Zutaten und Zubereitung dürfen nicht leer sein."); return; }
+    if (!draft.title.trim() || !ingredients.length) { setError("Titel und Zutaten dürfen nicht leer sein."); return; }
     setError(""); setStatus("saving");
     try {
       const form = new FormData();
@@ -95,10 +95,11 @@ function ImagePicker({ number, title, hint, file, onChange }: { number: string; 
 
 function RecipeEditor({ draft, setDraft, error, status, onBack, onSave }: { draft: Draft; setDraft: (draft: Draft) => void; error: string; status: string; onBack: () => void; onSave: () => void }) {
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft({ ...draft, [key]: value });
-  const missing = [!draft.title.trim() && "Titel", !draft.ingredients.some((item) => item.trim()) && "Zutaten", !draft.steps.some((item) => item.trim()) && "Zubereitungsschritte"].filter(Boolean);
+  const missing = [!draft.title.trim() && "Titel", !draft.ingredients.some((item) => item.trim()) && "Zutaten"].filter(Boolean);
   return (
     <div className="recipe-editor">
       <div className="editor-banner"><span>✓</span><div><strong>{missing.length ? "Rezept teilweise erkannt" : "Rezept erkannt"}</strong><p>{missing.length ? `Noch ergänzen: ${missing.join(", ")}. Diese Angaben wurden nicht erkannt. Die übrigen Angaben wurden übernommen.` : "Bitte Mengen und Schritte kurz kontrollieren."}</p></div></div>
+      {!draft.steps.some((item) => item.trim()) && <p className="privacy-note">Zubereitung ist optional. Du kannst das Rezept auch ohne Schritte speichern.</p>}
       <div className="editor-fields">
         <label className="field wide"><span>Titel</span><input value={draft.title} onChange={(event) => set("title", event.target.value)} /></label>
         <label className="field"><span>Zeit</span><input value={draft.time} onChange={(event) => set("time", event.target.value)} /></label>

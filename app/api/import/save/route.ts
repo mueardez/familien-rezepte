@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
   let draft: Draft;
   try { draft = normalizeDraft(JSON.parse(rawRecipe)); }
-  catch { return NextResponse.json({ error: "Bitte Titel, Zutaten und Zubereitung vollständig ausfüllen." }, { status: 400 }); }
+  catch { return NextResponse.json({ error: "Bitte Titel und Zutaten vollständig ausfüllen." }, { status: 400 }); }
 
   const id = crypto.randomUUID();
   const slug = await uniqueSlug(draft.title, id);
@@ -62,7 +62,7 @@ function normalizeDraft(value: Partial<Draft>): Draft {
   const title = String(value.title ?? "").trim();
   const ingredients = (value.ingredients ?? []).map(String).map((item) => item.trim()).filter(Boolean);
   const steps = (value.steps ?? []).map(String).map((item) => item.trim()).filter(Boolean);
-  if (!title || !ingredients.length || !steps.length) throw new Error("Incomplete draft");
+  if (!title || !ingredients.length) throw new Error("Incomplete draft");
   return {
     title: title.slice(0, 180),
     language: value.language === "en" ? "en" : "de",
