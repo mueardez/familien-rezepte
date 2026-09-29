@@ -283,3 +283,67 @@ test("weekly list saves recipes and extras, guards mutations and exports only op
     assert.match(publicPage.headers.get("x-robots-tag"), /noindex/);
   } finally { delete config.DB; delete config.BUCKET; }
 });
+
+test("two voters resolve seven unique recipes into the existing weekly list", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("poll", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const objects = new Map(); let revision = 0;
+  config.POLL_VOTERS = "admin@example.com,member@example.com";
+  config.POLL_DISPATCH_SECRET = "test-secret-0123456789012345678901234567";
+  config.DB = { prepare: () => ({ all: async () => ({ results: [] }) }) };
+  config.BUCKET = {
+    get: async (key) => objects.has(key) ? { etag: objects.get(key).etag, text: async () => objects.get(key).text } : null,
+    put: async (key, value, options) => {
+      const old = objects.get(key);
+      if (options?.onlyIf instanceof Headers && old) return null;
+      if (options?.onlyIf?.etagMatches && old?.etag !== options.onlyIf.etagMatches) return null;
+      const saved = { text: value, etag: String(++revision) }; objects.set(key, saved); return saved;
+    },
+  };
+  const request = (path, options = {}) => worker.fetch(new Request(config.APP_ORIGIN + path, options), {}, { waitUntil() {}, passThroughOnException() {} });
+  const headersFor = async (email) => {
+    const token = await new SignJWT({ sub: email, email }).setProtectedHeader({ alg: "HS256" })
+      .setIssuer(config.APP_ORIGIN).setAudience("session").setIssuedAt().setExpirationTime("5m")
+      .sign(new TextEncoder().encode(config.SESSION_SECRET));
+    return { origin: config.APP_ORIGIN, cookie: `__Host-familien-session=${token}`, "content-type": "application/json" };
+  };
+  try {
+    assert.equal((await request("/api/polls/dispatch", { method: "POST" })).status, 401);
+    const dispatch = await request("/api/polls/dispatch", { method: "POST", headers: { authorization: `Bearer ${config.POLL_DISPATCH_SECRET}` } });
+    assert.equal(dispatch.status, 200);
+    const { week, recipients, url } = await dispatch.json();
+    assert.deepEqual(recipients, ["admin@example.com", "member@example.com"]);
+    assert.equal(url, config.APP_ORIGIN + "/abstimmung");
+    assert.equal((await request("/api/polls")).status, 401);
+    const h1 = await headersFor("admin@example.com");
+    const h2 = await headersFor("member@example.com");
+    const view = await request("/api/polls", { headers: h1 });
+    assert.equal(view.status, 200);
+    const { choices } = await view.json();
+    assert.equal(choices.length, 10);
+    const first = choices.slice(0, 7).map((item) => item.slug);
+    const second = choices.slice(3, 10).map((item) => item.slug);
+    const homePage = await request("/", { headers: { accept: "text/html" } });
+    const manual = [...(await homePage.text()).matchAll(/href="\/rezepte\/([^"]+)"/g)].map((match) => match[1]).find((slug) => !choices.some((item) => item.slug === slug));
+    assert.ok(manual);
+    const before = await request("/api/shopping-list", { method: "PUT", headers: h1, body: JSON.stringify({ week, version: "", list: { recipes: [manual], extras: [], checked: [] } }) });
+    assert.equal(before.status, 200);
+    const bad = await request("/api/polls", { method: "PUT", headers: h1, body: JSON.stringify({ selected: first.slice(0, 6) }) });
+    assert.equal(bad.status, 400);
+    const firstVote = await request("/api/polls", { method: "PUT", headers: h1, body: JSON.stringify({ selected: first }) });
+    assert.equal(firstVote.status, 200);
+    const secondVote = await request("/api/polls", { method: "PUT", headers: h2, body: JSON.stringify({ selected: second }) });
+    assert.equal(secondVote.status, 200, await secondVote.clone().text());
+    const result = await request("/api/polls", { headers: h1 });
+    const { winners, complete, voted } = await result.json();
+    assert.equal(complete, true); assert.equal(voted, 2); assert.equal(winners.length, 7);
+    assert.ok(first.slice(3).every((slug) => winners.some((item) => item.slug === slug)));
+    const shopping = await request(`/api/shopping-list?week=${week}`, { headers: h1 });
+    const { list } = await shopping.json();
+    assert.equal(list.recipes.length, 8); // One previous manual choice + seven winners.
+    assert.equal(new Set(list.recipes).size, 8);
+    assert.ok(winners.every((item) => list.recipes.includes(item.slug)));
+    assert.equal((await request("/api/polls", { method: "PUT", headers: h1, body: JSON.stringify({ selected: first }) })).status, 409);
+  } finally { delete config.DB; delete config.BUCKET; delete config.POLL_VOTERS; delete config.POLL_DISPATCH_SECRET; }
+});

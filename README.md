@@ -152,3 +152,16 @@ CPU-Limits, Speicher, API-Aufrufe und mögliche Tarifänderungen beachten.
 Angemeldete Personen können unter `/einkaufsliste` pro Kalenderwoche Rezepte auswählen, eigene Lebensmittel ergänzen, Artikel abhaken und die Liste gemeinsam speichern. Die Wochen beginnen montags in der Zeitzone Europe/Zurich. Die Daten liegen im konfigurierten R2-Bucket; keine neue D1-Migration ist erforderlich. Gleichzeitige Änderungen werden über R2-ETags erkannt und nicht still überschrieben.
 
 „Für Bring! vorbereiten“ erzeugt einen sieben Tage gültigen, zufällig adressierten Export der noch offenen Artikel. Die öffentliche Exportseite enthält strukturierte Schema.org-Rezeptdaten und wird über den Bring!-Rezept-Deep-Link importiert. Jede Person mit dem Exportlink kann die Artikel während dieser Zeit sehen; es werden keine Kontodaten exportiert. Die Übernahme muss in Bring! bestätigt werden, und Änderungen werden nicht zurücksynchronisiert.
+
+### Wöchentliche Rezeptabstimmung und Gmail
+
+Jeden Freitag kann ein Google Apps Script unter dem Gmail-Absenderkonto zwei Einladungen für die nächste Woche versenden. Die App zeigt zehn Vorschläge; zuvor vorgeschlagene Rezepte werden bei genügend Auswahl zunächst ausgelassen. Beide Personen wählen je genau sieben. Die gemeinsamen Treffer werden übernommen. Sind es weniger als sieben, ergänzt die App per stabiler, wochenabhängiger Zufallsauswahl aus den übrigen abgegebenen Stimmen bis auf sieben. Die sieben Ergebnisse werden ohne Dubletten in die bestehende Wocheneinkaufsliste eingefügt. Weitere Rezepte lassen sich dort manuell ergänzen. Die Abstimmung wird erst mit dem ersten erfolgreichen Versandlauf eröffnet. Beim Einloggen ist das jeweilige Google-Konto maßgeblich; ein E-Mail-Link allein gibt keinen Zugriff.
+
+Einmalige Einrichtung:
+
+1. In Cloudflare beim Worker unter **Settings → Variables and Secrets** `POLL_VOTERS` als Text die beiden Google-Adressen der Abstimmenden und `POLL_DISPATCH_SECRET` als Secret (mindestens 32 zufällige Zeichen) speichern. `POLL_VOTERS` kann entfallen, wenn `ALLOWED_EMAILS` genau diese beiden Adressen enthält.
+2. Unter [script.google.com](https://script.google.com/) mit dem Gmail-Absenderkonto ein neues Projekt anlegen; Inhalt von `scripts/google-vote-mail.gs` hineinkopieren. In den Projekteinstellungen **Europe/Zurich** als Zeitzone setzen.
+3. In den Skripteigenschaften `POLL_DISPATCH_SECRET` mit demselben Wert hinterlegen. Danach einmal `installFridayTrigger` starten und die Google-Berechtigungen bestätigen. Das Skript versendet freitags ungefähr um 17 Uhr Schweizer Zeit aus diesem Gmail-Konto; Apps-Script-Trigger laufen nicht minutengenau.
+4. Zum Funktionstest `sendFridayPoll` einmal manuell ausführen. Derselbe Wochenlauf verschickt an jede Adresse nur einmal eine Einladung (markiert in den Skripteigenschaften). Den Link `/abstimmung` mit beiden Google-Konten öffnen und je sieben Rezepte wählen.
+
+Das Script benötigt ausschließlich die Google-Berechtigung zum E-Mail-Versand und zum Abruf der App. Der Schlüssel darf weder in GitHub noch in die Websiteoberfläche geschrieben werden. Für den Zeittrigger ist kein Cloudflare-Cron nötig. Ohne diese einmalige Einrichtung kann die Abstimmung in der App angezeigt, aber keine Freitags-E-Mail automatisch verschickt werden.

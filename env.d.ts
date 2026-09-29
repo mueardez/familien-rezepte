@@ -9,5 +9,7 @@ declare namespace Cloudflare {
     RECIPE_ADMIN_EMAIL?: string;
     ALLOWED_EMAILS?: string;
     OPENAI_API_KEY?: string;
+    POLL_VOTERS?: string;
+    POLL_DISPATCH_SECRET?: string;
   }
 }
