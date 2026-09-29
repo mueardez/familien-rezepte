@@ -81,6 +81,32 @@ test("renders the recipe collection and import entry point", async () => {
     }
   }
 
+  // A readable ingredient-only extraction must reach the editor, not a photo-quality error.
+  const realFetch = globalThis.fetch;
+  config.OPENAI_API_KEY = "test-only-no-network";
+  const token = await new SignJWT({ sub: "member", email: "member@example.com" }).setProtectedHeader({ alg: "HS256" })
+    .setIssuer(config.APP_ORIGIN).setAudience("session").setIssuedAt().setExpirationTime("5m")
+    .sign(new TextEncoder().encode(config.SESSION_SECRET));
+  const ingredientsOnly = { title: "", language: "de", time: "", servings: "", method: "Andere", ingredients: ["1 Wrap", "3 Eier", "40 g geriebener Käse"], steps: [] };
+  try {
+    for (const [output, expected] of [[JSON.stringify(ingredientsOnly), 200], [JSON.stringify({ ...ingredientsOnly, ingredients: [] }), 422], ["invalid json", 422]]) {
+      globalThis.fetch = async (url) => {
+        assert.equal(url, "https://api.openai.com/v1/responses");
+        return Response.json({ output: [{ content: [{ type: "output_text", text: output }] }] });
+      };
+      const form = new FormData();
+      form.set("textImage", new File(["test-image"], "recipe.png", { type: "image/png" }));
+      const result = await fetchPage("/api/import/analyze", { method: "POST", body: form, headers: { origin: config.APP_ORIGIN, cookie: `__Host-familien-session=${token}` } });
+      assert.equal(result.status, expected);
+      const data = await result.json();
+      if (expected === 200) assert.deepEqual(data.recipe, ingredientsOnly);
+      else assert.doesNotMatch(data.error, /schärfer/);
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+    delete config.OPENAI_API_KEY;
+  }
+
   const login = await fetchPage("/auth/google?return_to=%2Frezept-import");
   assert.equal(login.status, 302);
   const google = new URL(login.headers.get("location"));

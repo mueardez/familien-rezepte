@@ -95,9 +95,10 @@ function ImagePicker({ number, title, hint, file, onChange }: { number: string; 
 
 function RecipeEditor({ draft, setDraft, error, status, onBack, onSave }: { draft: Draft; setDraft: (draft: Draft) => void; error: string; status: string; onBack: () => void; onSave: () => void }) {
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft({ ...draft, [key]: value });
+  const missing = [!draft.title.trim() && "Titel", !draft.ingredients.some((item) => item.trim()) && "Zutaten", !draft.steps.some((item) => item.trim()) && "Zubereitungsschritte"].filter(Boolean);
   return (
     <div className="recipe-editor">
-      <div className="editor-banner"><span>✓</span><div><strong>Rezept erkannt</strong><p>Bitte Mengen und Schritte kurz kontrollieren.</p></div></div>
+      <div className="editor-banner"><span>✓</span><div><strong>{missing.length ? "Rezept teilweise erkannt" : "Rezept erkannt"}</strong><p>{missing.length ? `Noch ergänzen: ${missing.join(", ")}. Diese Angaben wurden nicht erkannt. Die übrigen Angaben wurden übernommen.` : "Bitte Mengen und Schritte kurz kontrollieren."}</p></div></div>
       <div className="editor-fields">
         <label className="field wide"><span>Titel</span><input value={draft.title} onChange={(event) => set("title", event.target.value)} /></label>
         <label className="field"><span>Zeit</span><input value={draft.time} onChange={(event) => set("time", event.target.value)} /></label>
