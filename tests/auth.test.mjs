@@ -9,6 +9,8 @@ const config = { APP_ORIGIN: "https://recipes.example.com", GOOGLE_CLIENT_ID: "t
 test("configuration fails closed and requires a fixed HTTPS origin", () => {
   assert.equal(authConfigured({}), false);
   assert.equal(authConfigured(config), true);
+  assert.equal(authConfigured({ ...config, RECIPE_ADMIN_EMAIL: undefined }), true);
+  assert.equal(authConfigured({ ...config, RECIPE_ADMIN_EMAIL: "", ALLOWED_EMAILS: " , " }), false);
   assert.equal(authConfigured({ ...config, SESSION_SECRET: "short" }), false);
   for (const origin of ["http://example.com", "https://example.com/path", "https://user@example.com", "https://example.com/?q=1"]) {
     assert.throws(() => appOrigin({ APP_ORIGIN: origin }));

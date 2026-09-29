@@ -58,13 +58,28 @@ test("renders the recipe collection and import entry point", async () => {
   }
   const forbiddenOrigin = await fetchPage("/api/import/save", { method: "POST", headers: { origin: "https://evil.com" } });
   assert.equal(forbiddenOrigin.status, 403);
-  const memberToken = await new SignJWT({ sub: "member", email: "member@example.com" }).setProtectedHeader({ alg: "HS256" })
-    .setIssuer(config.APP_ORIGIN).setAudience("session").setIssuedAt().setExpirationTime("5m")
-    .sign(new TextEncoder().encode(config.SESSION_SECRET));
-  const memberImport = await fetchPage("/api/import/save", { method: "POST", headers: {
-    origin: config.APP_ORIGIN, cookie: `__Host-familien-session=${memberToken}`,
-  } });
-  assert.equal(memberImport.status, 403);
+  // Both allowed accounts have equal access; outsiders and removed users do not.
+  for (const email of ["admin@example.com", "member@example.com", "stranger@example.com"]) {
+    const token = await new SignJWT({ sub: email, email }).setProtectedHeader({ alg: "HS256" })
+      .setIssuer(config.APP_ORIGIN).setAudience("session").setIssuedAt().setExpirationTime("5m")
+      .sign(new TextEncoder().encode(config.SESSION_SECRET));
+    const headers = { origin: config.APP_ORIGIN, cookie: `__Host-familien-session=${token}` };
+    const allowed = email !== "stranger@example.com";
+    for (const endpoint of ["/api/import/save", "/api/import/analyze"]) {
+      const result = await fetchPage(endpoint, { method: "POST", headers });
+      // Authorized requests reach dependency validation (test env has no storage/API key).
+      assert.equal(result.status, allowed ? 503 : 401, email + endpoint);
+    }
+    if (allowed) {
+      const page = await fetchPage("/rezept-import", { headers: { ...headers, accept: "text/html" } });
+      assert.equal(page.status, 200);
+      const body = await page.text();
+      assert.match(body, /Bild auswählen/);
+      assert.doesNotMatch(body, /Kein Zugriff/);
+      const crossSite = await fetchPage("/api/import/save", { method: "POST", headers: { ...headers, origin: "https://evil.com" } });
+      assert.equal(crossSite.status, 403);
+    }
+  }
 
   const login = await fetchPage("/auth/google?return_to=%2Frezept-import");
   assert.equal(login.status, 302);

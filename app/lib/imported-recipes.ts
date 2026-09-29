@@ -45,12 +45,3 @@ export async function getImportedRecipe(slug: string): Promise<Recipe | undefine
   ).bind(slug).first<ImportedRecipeRow>();
   return row ? rowToRecipe(row) : undefined;
 }
-
-export function recipeAdminEmail(): string {
-  return (env.RECIPE_ADMIN_EMAIL || "").trim().toLocaleLowerCase("de-CH");
-}
-
-export function isRecipeAdmin(email: string): boolean {
-  const allowed = recipeAdminEmail();
-  return Boolean(allowed) && email.trim().toLocaleLowerCase("de-CH") === allowed;
-}

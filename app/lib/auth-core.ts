@@ -27,13 +27,18 @@ export function authConfigured(config: AuthConfig): boolean {
   try {
     return Boolean(config.APP_ORIGIN && appOrigin(config) && config.GOOGLE_CLIENT_ID &&
       config.GOOGLE_CLIENT_SECRET && config.SESSION_SECRET && config.SESSION_SECRET.length >= 32 &&
-      config.RECIPE_ADMIN_EMAIL);
+      allowedEmails(config).length);
   } catch { return false; }
 }
 
-export function emailAllowed(email: string, config: AuthConfig): boolean {
+function allowedEmails(config: AuthConfig): string[] {
+  // Keep the previous setting as an additional allowed account, without a special role.
   return [config.RECIPE_ADMIN_EMAIL || "", ...(config.ALLOWED_EMAILS || "").split(",")]
-    .map((value) => value.trim().toLowerCase()).filter(Boolean).includes(email.trim().toLowerCase());
+    .map((value) => value.trim().toLowerCase()).filter(Boolean);
+}
+
+export function emailAllowed(email: string, config: AuthConfig): boolean {
+  return allowedEmails(config).includes(email.trim().toLowerCase());
 }
 
 export function safeReturnPath(value: string | null): string {

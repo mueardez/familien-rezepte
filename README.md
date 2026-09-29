@@ -12,7 +12,7 @@ Kein ChatGPT-Login, keine Übernahme ungeprüfter Identitäts-Header.
 - Import aus Textbild und Gerichtsfoto (Deutsch/Englisch), Fotomediathek-Auswahl,
   Instagram-Kennzeichen und kombinierbare Filter sind enthalten.
 - Google-Anmeldung mit serverseitiger Prüfung; nur freigegebene Konten.
-- Nur RECIPE_ADMIN_EMAIL darf Rezepte importieren/speichern.
+- Alle freigegebenen Nutzer haben dieselben Rechte und dürfen Rezepte importieren/speichern.
 - Google verlangt nur `openid email`, keinen Gmail-Zugriff.
 - Noch nicht enthalten: Einkaufslisten-Erweiterung aus dem zurückgenommenen Stand,
   Umfragen, E-Mail-Versand, automatische Freitags-Aufgaben.
@@ -95,13 +95,13 @@ Variables and Secrets hinterlegen:
 | `GOOGLE_CLIENT_ID` | Web-OAuth-Client-ID |
 | `GOOGLE_CLIENT_SECRET` | **Secret**: Google-Client-Secret |
 | `SESSION_SECRET` | **Secret**: mindestens 32 zufällige Bytes, z.B. lokal mit `openssl rand -hex 32` erzeugen |
-| `RECIPE_ADMIN_EMAIL` | **Secret** empfohlen: bestätigte Admin-Adresse |
-| `ALLOWED_EMAILS` | **Secret** empfohlen: zwei weitere freigegebene Adressen, durch Komma getrennt |
+| `RECIPE_ADMIN_EMAIL` | Optionaler Altbestand: zusätzliche freigegebene Adresse, ohne Sonderrechte |
+| `ALLOWED_EMAILS` | **Secret** empfohlen: freigegebene Nutzeradressen, durch Komma getrennt; alle haben gleiche Rechte |
 | `OPENAI_API_KEY` | **Secret**: API-Schlüssel für die Bilderkennung |
 
 Die echten Adressen werden absichtlich nicht in diesem öffentlichen Quellcode
-festgeschrieben. ALLOWED_EMAILS berechtigt nicht zum Rezeptimport; dieser bleibt
-beim Admin. Login-Sessions gelten 7 Tage. Entfernte Konten werden bei jeder
+festgeschrieben. Alle freigegebenen Konten dürfen Rezepte importieren und speichern.
+Es gibt keine separate App-Adminrolle. GitHub-/Cloudflare-Zugänge sind davon unabhängig. Login-Sessions gelten 7 Tage. Entfernte Konten werden bei jeder
 Anfrage abgewiesen. Änderung des SESSION_SECRET beendet alle bestehenden Sessions.
 Logout entfernt die Sitzung aus dem Browser (keine individuelle serverseitige
 Token-Sperrliste). Ohne eigene Domain bleibt die workers.dev-Adresse ausreichend
@@ -111,8 +111,8 @@ bestätigt werden.
 ## 5. Abnahmetest vor Umschaltung
 
 - Öffentliche Übersicht und bestehende Rezeptdetails; Bring!-Import.
-- Google-Login als Admin; anderes nicht freigegebenes Konto wird abgewiesen.
-- Mitglied kann sich anmelden, darf aber keine Rezepte importieren.
+- Google-Login als freigegebener Nutzer; anderes nicht freigegebenes Konto wird abgewiesen.
+- Jedes freigegebene Mitglied kann den Import öffnen und Rezepte anlegen.
 - Bildupload auf iPhone: vorhandene Bilder auswählen, keine erzwungene Kamera.
 - Deutsches und englisches Rezept: erkennen, korrigieren, speichern, wieder öffnen.
 - Instagram-Filter zusammen mit Ofen; Gerichtsfoto auf neuer Adresse.

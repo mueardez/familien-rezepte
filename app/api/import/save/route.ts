@@ -2,7 +2,6 @@ import { env } from "cloudflare:workers";
 import { NextResponse } from "next/server";
 import { getUser } from "../../../auth";
 import { sameOriginMutation } from "../../../lib/auth-core";
-import { isRecipeAdmin } from "../../../lib/imported-recipes";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +20,6 @@ export async function POST(request: Request) {
   if (!sameOriginMutation(request, env)) return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 403 });
   const user = await getUser();
   if (!user) return NextResponse.json({ error: "Bitte zuerst mit Google anmelden." }, { status: 401 });
-  if (!isRecipeAdmin(user.email)) return NextResponse.json({ error: "Du darfst keine Rezepte hinzufügen." }, { status: 403 });
   if (!env.DB || !env.BUCKET) return NextResponse.json({ error: "Der Rezeptspeicher ist noch nicht verfügbar." }, { status: 503 });
 
   const form = await request.formData();
