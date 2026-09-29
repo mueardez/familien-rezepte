@@ -223,3 +223,63 @@ test("renders the recipe collection and import entry point", async () => {
   assert.equal(logout.status, 303);
   assert.match(logout.headers.get("set-cookie"), /Max-Age=0/);
 });
+
+test("weekly list saves recipes and extras, guards mutations and exports only open items", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("shopping", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const objects = new Map();
+  let revision = 0;
+  config.DB = { prepare: () => ({ all: async () => ({ results: [] }) }) };
+  config.BUCKET = {
+    get: async (key) => objects.has(key) ? { etag: objects.get(key).etag, text: async () => objects.get(key).text } : null,
+    put: async (key, value, options) => {
+      const previous = objects.get(key);
+      const condition = options?.onlyIf;
+      if (condition instanceof Headers && condition.get("If-None-Match") === "*" && previous) return null;
+      if (condition?.etagMatches && previous?.etag !== condition.etagMatches) return null;
+      const object = { text: value, etag: String(++revision) };
+      objects.set(key, object);
+      return object;
+    },
+  };
+  const token = await new SignJWT({ sub: "member", email: "member@example.com" }).setProtectedHeader({ alg: "HS256" })
+    .setIssuer(config.APP_ORIGIN).setAudience("session").setIssuedAt().setExpirationTime("5m")
+    .sign(new TextEncoder().encode(config.SESSION_SECRET));
+  const headers = { origin: config.APP_ORIGIN, cookie: `__Host-familien-session=${token}`, "content-type": "application/json" };
+  const fetchPage = (path, options = {}) => worker.fetch(new Request(config.APP_ORIGIN + path, options), {}, { waitUntil() {}, passThroughOnException() {} });
+  try {
+    const privatePage = await fetchPage("/einkaufsliste", { headers: { accept: "text/html" } });
+    assert.equal(privatePage.status, 307);
+    const page = await fetchPage("/einkaufsliste", { headers: { ...headers, accept: "text/html" } });
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /Wocheneinkaufsliste/);
+    const week = "2026-09-28";
+    const first = await fetchPage(`/api/shopping-list?week=${week}`, { headers });
+    assert.equal(first.status, 200);
+    assert.equal((await first.json()).version, "");
+    const list = { recipes: ["petromax-schinken-kaese-kartoffelrolle"], extras: [{ id: "123e4567-e89b-42d3-a456-426614174000", text: "1 Liter Milch" }], checked: ["123e4567-e89b-42d3-a456-426614174000"] };
+    // Use an existing slug from the collection.
+    const home = await fetchPage("/", { headers: { accept: "text/html" } });
+    const slug = [...(await home.text()).matchAll(/href="\/rezepte\/(petromax-[^"]+)"/g)][0]?.[1];
+    assert.ok(slug);
+    list.recipes = [slug];
+    const save = await fetchPage("/api/shopping-list", { method: "PUT", headers, body: JSON.stringify({ week, version: "", list }) });
+    assert.equal(save.status, 200, await save.clone().text());
+    const version = (await save.json()).version;
+    const conflict = await fetchPage("/api/shopping-list", { method: "PUT", headers, body: JSON.stringify({ week, version: "", list }) });
+    assert.equal(conflict.status, 409);
+    const crossSite = await fetchPage("/api/shopping-list", { method: "PUT", headers: { ...headers, origin: "https://evil.example" }, body: JSON.stringify({ week, version, list }) });
+    assert.equal(crossSite.status, 403);
+    const exported = await fetchPage("/api/shopping-list/export", { method: "POST", headers, body: JSON.stringify({ week }) });
+    assert.equal(exported.status, 200, await exported.clone().text());
+    const { publicUrl, deepLink } = await exported.json();
+    assert.match(deepLink, /api\.getbring\.com/);
+    const publicPage = await fetchPage(new URL(publicUrl).pathname);
+    assert.equal(publicPage.status, 200);
+    const html = await publicPage.text();
+    assert.match(html, /recipeIngredient/);
+    assert.doesNotMatch(html, /1 Liter Milch/);
+    assert.match(publicPage.headers.get("x-robots-tag"), /noindex/);
+  } finally { delete config.DB; delete config.BUCKET; }
+});

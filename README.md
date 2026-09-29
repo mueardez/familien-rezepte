@@ -146,3 +146,9 @@ CPU-Limits, Speicher, API-Aufrufe und mögliche Tarifänderungen beachten.
 - Cloudflare Deployment-Dry-Run bestanden, nichts veröffentlicht.
 - Echte Google-Anmeldung, KI-Erkennung, bestehende Datenübernahme und iPhone-Test
   stehen noch aus; dafür werden die eigenen Accounts/Ressourcen benötigt.
+
+### Wocheneinkaufsliste
+
+Angemeldete Personen können unter `/einkaufsliste` pro Kalenderwoche Rezepte auswählen, eigene Lebensmittel ergänzen, Artikel abhaken und die Liste gemeinsam speichern. Die Wochen beginnen montags in der Zeitzone Europe/Zurich. Die Daten liegen im konfigurierten R2-Bucket; keine neue D1-Migration ist erforderlich. Gleichzeitige Änderungen werden über R2-ETags erkannt und nicht still überschrieben.
+
+„Für Bring! vorbereiten“ erzeugt einen sieben Tage gültigen, zufällig adressierten Export der noch offenen Artikel. Die öffentliche Exportseite enthält strukturierte Schema.org-Rezeptdaten und wird über den Bring!-Rezept-Deep-Link importiert. Jede Person mit dem Exportlink kann die Artikel während dieser Zeit sehen; es werden keine Kontodaten exportiert. Die Übernahme muss in Bring! bestätigt werden, und Änderungen werden nicht zurücksynchronisiert.
