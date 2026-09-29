@@ -326,11 +326,11 @@ test("two voters resolve seven unique recipes into the existing weekly list", as
   };
   try {
     assert.equal((await request("/api/polls/dispatch", { method: "POST" })).status, 401);
-    const dispatch = await request("/api/polls/dispatch", { method: "POST", headers: { authorization: `Bearer ${config.POLL_DISPATCH_SECRET}` } });
+    const dispatch = await request("/api/polls/dispatch", { method: "POST", headers: { authorization: `Bearer ${config.POLL_DISPATCH_SECRET}`, "content-type": "application/json" }, body: JSON.stringify({ scheduled: false }) });
     assert.equal(dispatch.status, 200);
     const { week, recipients, url } = await dispatch.json();
     assert.deepEqual(recipients, ["admin@example.com", "member@example.com"]);
-    assert.equal(url, config.APP_ORIGIN + "/abstimmung");
+    assert.equal(url, config.APP_ORIGIN + `/abstimmung?week=${week}`);
     assert.equal((await request("/api/polls")).status, 401);
     const h1 = await headersFor("admin@example.com");
     const h2 = await headersFor("member@example.com");
@@ -388,6 +388,14 @@ test("catalog migration reuses foods and method CRUD preserves recipe references
     const firstSnapshot = files.get("catalog/v1.json");
     assert.equal((await mutate({ action: "migrate" })).status, 200);
     assert.equal(files.get("catalog/v1.json"), firstSnapshot);
+    assert.equal((await mutate({ action: "mail-schedule", schedule: { weekday: 3, time: "19:30", enabled: false } })).status, 200);
+    assert.deepEqual(JSON.parse(files.get("catalog/v1.json")).mailSchedule, { weekday: 3, time: "19:30", enabled: false });
+    assert.equal((await mutate({ action: "mail-schedule", schedule: { weekday: 8, time: "26:00", enabled: true } })).status, 400);
+    config.POLL_VOTERS = "admin@example.com,member@example.com";
+    config.POLL_DISPATCH_SECRET = "test-schedule-secret-01234567890123456789";
+    const paused = await request("/api/polls/dispatch", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${config.POLL_DISPATCH_SECRET}` }, body: JSON.stringify({ scheduled: true }) });
+    assert.equal(paused.status, 200); assert.deepEqual(await paused.json(), { due: false, recipients: [] });
+    delete config.POLL_VOTERS; delete config.POLL_DISPATCH_SECRET;
     assert.equal((await mutate({ action: "method-create", name: "Dampfgarer", inPoll: false })).status, 200);
     assert.equal((await mutate({ action: "method-create", name: "Dampfgarer", inPoll: true })).status, 400);
     assert.equal((await mutate({ action: "method-update", id: "ofen", name: "Backofen", inPoll: false })).status, 200);

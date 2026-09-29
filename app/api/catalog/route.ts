@@ -5,11 +5,12 @@ import { sameOriginMutation } from "../../lib/auth-core";
 import { changeCatalog, migrateCatalog, readCatalog } from "../../lib/catalog";
 import { allRecipes } from "../../lib/shopping-list";
 import { canonicalName, foodKey } from "../../lib/ingredients";
+import { defaultMailSchedule, normalizeMailSchedule } from "../../lib/mail-schedule";
 export const dynamic = "force-dynamic";
 export async function GET() {
   if (!await getUser()) return NextResponse.json({ error: "Bitte anmelden." }, { status: 401 });
   const { data } = await readCatalog();
-  return NextResponse.json({ methods: data.methods, foods: data.foods, migratedAt: data.migratedAt, review: (await allRecipes()).flatMap((recipe) => (recipe.ingredientItems ?? []).filter((item) => item.review).map((item) => ({ slug: recipe.slug, original: item.original, name: item.name }))) }, { headers: { "cache-control": "private, no-store" } });
+  return NextResponse.json({ mailSchedule: data.mailSchedule ?? defaultMailSchedule, methods: data.methods, foods: data.foods, migratedAt: data.migratedAt, review: (await allRecipes()).flatMap((recipe) => (recipe.ingredientItems ?? []).filter((item) => item.review).map((item) => ({ slug: recipe.slug, original: item.original, name: item.name }))) }, { headers: { "cache-control": "private, no-store" } });
 }
 export async function POST(request: Request) {
   if (!sameOriginMutation(request, env)) return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 403 });
@@ -21,7 +22,9 @@ export async function POST(request: Request) {
     if (body.action === "migrate") return NextResponse.json(await migrateCatalog());
     await changeCatalog((data) => {
       const name = typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
-      if (body.action === "method-create" || body.action === "method-update") {
+      if (body.action === "mail-schedule") {
+        data.mailSchedule = normalizeMailSchedule(body.schedule);
+      } else if (body.action === "method-create" || body.action === "method-update") {
         if (!name || typeof body.inPoll !== "boolean") throw new Error("Name und Umfragefreigabe sind erforderlich.");
         if (data.methods.some((method) => method.id !== body.id && [method.name, ...method.aliases].some((alias) => foodKey(alias) === foodKey(name)))) throw new Error("Diese Zubereitungsart existiert bereits.");
         if (body.action === "method-create") data.methods.push({ id: crypto.randomUUID(), name, aliases: [name], inPoll: body.inPoll });

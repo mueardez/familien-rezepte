@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 type Choice = { slug: string; title: string };
 type PollView = { week: string; choices: Choice[]; selected: string[]; voted: number; complete: boolean; winners: Choice[] };
-export function PollEditor() {
+export function PollEditor({ requestedWeek }: { requestedWeek?: string }) {
   const [poll, setPoll] = useState<PollView | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -11,18 +11,18 @@ export function PollEditor() {
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/polls", { cache: "no-store" });
+      const response = await fetch(requestedWeek ? `/api/polls?week=${encodeURIComponent(requestedWeek)}` : "/api/polls", { cache: "no-store" });
       const data = await response.json() as PollView & { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Abstimmung konnte nicht geladen werden.");
       setPoll(data); setSelected(data.selected); setError("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Abstimmung konnte nicht geladen werden."); }
     finally { setLoading(false); }
-  }, []);
+  }, [requestedWeek]);
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
   const submit = async () => {
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/polls", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ selected }) });
+      const response = await fetch("/api/polls", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ selected, week: poll?.week }) });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Speichern fehlgeschlagen.");
       await load();

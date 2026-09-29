@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
+import type { MailSchedule } from "./mail-schedule";
 import { recipes, type Recipe } from "../data/recipes";
 import { canonicalName, defaultMethods, foodKey, ingredientText, normalizeIngredient, type Ingredient, type Food, type Method } from "./ingredients";
-export type Catalog = { methods: Method[]; foods: Food[]; migrated: Record<string, Ingredient[]>; migratedAt?: string; backupKey?: string; redirects?: Record<string, string> };
+export type Catalog = { mailSchedule?: MailSchedule; methods: Method[]; foods: Food[]; migrated: Record<string, Ingredient[]>; migratedAt?: string; backupKey?: string; redirects?: Record<string, string> };
 export const CATALOG_KEY = "catalog/v1.json";
 export const emptyCatalog = (): Catalog => ({ methods: structuredClone(defaultMethods), foods: [], migrated: {} });
 export async function readCatalog(): Promise<{ data: Catalog; version: string }> {

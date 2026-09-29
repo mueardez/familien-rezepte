@@ -2,19 +2,20 @@ import { env } from "cloudflare:workers";
 import { NextResponse } from "next/server";
 import { getUser } from "../../auth";
 import { sameOriginMutation } from "../../lib/auth-core";
-import { allRecipes } from "../../lib/shopping-list";
+import { allRecipes, currentWeek, validWeek } from "../../lib/shopping-list";
 import { nextWeek, pollKey, readPoll, resolveVotes, syncWinners, voters } from "../../lib/polls";
 
 export const dynamic = "force-dynamic";
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
-export async function GET() {
+export async function GET(request: Request) {
   const user = await getUser();
   if (!user) return fail("Bitte anmelden.", 401);
   if (!voters().includes(user.email)) return fail("Dieses Konto nimmt nicht an der Abstimmung teil.", 403);
   if (!env.BUCKET || !env.DB) return fail("Speicher nicht verfügbar.", 503);
-  const week = nextWeek();
+  const week = new URL(request.url).searchParams.get("week") ?? nextWeek();
+  if (!validWeek(week) || ![currentWeek(), nextWeek()].includes(week)) return fail("Diese Abstimmung ist nicht mehr verfügbar.", 400);
   const { poll } = await readPoll(week);
-  if (!poll) return fail("Die Abstimmung wird am Freitag eröffnet.", 404);
+  if (!poll) return fail("Die Abstimmung wird zum eingestellten Versandtermin eröffnet.", 404);
   if (poll.winners.length === 7) await syncWinners(poll);
   const catalogue = await allRecipes();
   return NextResponse.json({ week, choices: poll.choices.map((slug) => ({ slug, title: catalogue.find((item) => item.slug === slug)?.title ?? slug })), selected: poll.votes[user.email] ?? [], voted: Object.keys(poll.votes).length, complete: poll.winners.length === 7, winners: poll.winners.map((slug) => ({ slug, title: catalogue.find((item) => item.slug === slug)?.title ?? slug })) }, { headers: { "cache-control": "private, no-store" } });
@@ -25,9 +26,10 @@ export async function PUT(request: Request) {
   if (!user) return fail("Bitte anmelden.", 401);
   if (!voters().includes(user.email)) return fail("Dieses Konto nimmt nicht an der Abstimmung teil.", 403);
   if (!env.BUCKET || !env.DB) return fail("Speicher nicht verfügbar.", 503);
-  let body: { selected?: unknown };
+  let body: { selected?: unknown; week?: string };
   try { body = await request.json(); } catch { return fail("Ungültige Auswahl.", 400); }
-  const week = nextWeek();
+  const week = body.week ?? nextWeek();
+  if (!validWeek(week) || ![currentWeek(), nextWeek()].includes(week)) return fail("Diese Abstimmung ist nicht mehr verfügbar.", 400);
   const { poll, version } = await readPoll(week);
   if (!poll) return fail("Die Abstimmung ist noch nicht eröffnet.", 404);
   if (poll.winners.length === 7) return fail("Die Abstimmung ist abgeschlossen.", 409);
