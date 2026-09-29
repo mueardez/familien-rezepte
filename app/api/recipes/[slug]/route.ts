@@ -1,3 +1,4 @@
+import { prepareIngredients } from "../../../lib/catalog";
 import { env } from "cloudflare:workers";
 import { NextResponse } from "next/server";
 import { getUser } from "../../../auth";
@@ -23,6 +24,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
   let draft;
   try { draft = normalizeDraft(JSON.parse(String(raw))); }
   catch { return NextResponse.json({ error: "Bitte Titel und Zutaten ausfüllen." }, { status: 400 }); }
+  try { const linked = await prepareIngredients(draft.ingredients, draft.method); draft = { ...draft, ...linked }; }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Zutaten konnten nicht zugeordnet werden." }, { status: 400 }); }
+
   const photo = form.get("dishImage");
   if (photo !== null && (!(photo instanceof File) || !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(photo.type) || photo.size > 8 * 1024 * 1024)) {
     return NextResponse.json({ error: "Bitte ein Gerichtsfoto bis 8 MB verwenden." }, { status: 400 });

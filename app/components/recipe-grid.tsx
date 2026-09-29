@@ -5,11 +5,12 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import type { Recipe } from "../data/recipes";
 
-const methods = ["Alle", "Pfanne", "Topf", "Ofen", "Waffeleisen", "Petromax", "Andere"] as const;
 
-export function RecipeGrid({ recipes }: { recipes: Recipe[] }) {
+
+export function RecipeGrid({ recipes, methods: configured }: { recipes: Recipe[]; methods: string[] }) {
+  const methods = ["Alle", ...configured];
   const [query, setQuery] = useState("");
-  const [method, setMethod] = useState<(typeof methods)[number]>("Alle");
+  const [method, setMethod] = useState<string>("Alle");
   const [instagramOnly, setInstagramOnly] = useState(false);
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("de-CH");

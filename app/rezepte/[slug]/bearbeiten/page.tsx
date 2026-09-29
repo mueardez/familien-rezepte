@@ -1,3 +1,4 @@
+import { hydrateRecipe, readCatalog } from "../../../lib/catalog";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "../../../auth";
@@ -10,7 +11,8 @@ export const dynamic = "force-dynamic";
 export default async function EditRecipePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   await requireUser(`/rezepte/${encodeURIComponent(slug)}/bearbeiten`);
-  const recipe = await getImportedRecipe(slug) ?? getRecipe(slug);
+  const original = await getImportedRecipe(slug) ?? getRecipe(slug);
+  const recipe = original ? hydrateRecipe(original, (await readCatalog()).data) : undefined;
   if (!recipe) notFound();
   return (
     <main className="import-page">

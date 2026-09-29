@@ -11,7 +11,7 @@
     "build": "vinext build",
     "start": "vite preview",
     "deploy": "node scripts/check-deploy.mjs && wrangler deploy",
-    "test:auth": "node --experimental-strip-types --test tests/auth.test.mjs",
+    "test:auth": "node --experimental-strip-types --test tests/auth.test.mjs tests/ingredients.test.mjs",
     "test": "npm run test:auth && npm run build && node --experimental-loader ./tests/cloudflare-loader.mjs --test tests/rendered-html.test.mjs",
     "typecheck": "wrangler types && tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",

@@ -1,5 +1,7 @@
 import { env } from "cloudflare:workers";
 import { getRecipe, type Recipe } from "../data/recipes";
+import { hydrateRecipe, readCatalog } from "./catalog";
+import { ingredientText, normalizeIngredient } from "./ingredients";
 
 type ImportedRecipeRow = {
   slug: string;
@@ -16,6 +18,8 @@ type ImportedRecipeRow = {
 
 function rowToRecipe(row: ImportedRecipeRow): Recipe {
   const original = getRecipe(row.slug);
+  const raw = JSON.parse(row.ingredients_json);
+  const structured = Array.isArray(raw) && raw.every((item) => typeof item === "object");
   return {
     ...original,
     slug: row.slug,
@@ -25,7 +29,8 @@ function rowToRecipe(row: ImportedRecipeRow): Recipe {
     method: row.method,
     isInstagram: Boolean(row.instagram_recipe),
     icon: original?.icon ?? "🍽️",
-    ingredients: JSON.parse(row.ingredients_json),
+    ingredients: structured ? raw.map(normalizeIngredient).map(ingredientText) : raw,
+    ...(structured ? { ingredientItems: raw.map(normalizeIngredient) } : {}),
     steps: JSON.parse(row.steps_json),
     tip: original?.tip ?? "Dieses Rezept wurde aus einem Foto übernommen.",
     servings: row.servings,
@@ -39,7 +44,8 @@ export async function listImportedRecipes(): Promise<Recipe[]> {
     `SELECT slug, title, language, time, method, instagram_recipe, servings, ingredients_json, steps_json, image_key
      FROM imported_recipes ORDER BY created_at DESC`,
   ).all<ImportedRecipeRow>();
-  return result.results.map(rowToRecipe);
+  const { data } = await readCatalog();
+  return result.results.map(rowToRecipe).map((recipe) => hydrateRecipe(recipe, data));
 }
 
 export async function getImportedRecipe(slug: string): Promise<Recipe | undefined> {
@@ -48,5 +54,5 @@ export async function getImportedRecipe(slug: string): Promise<Recipe | undefine
     `SELECT slug, title, language, time, method, instagram_recipe, servings, ingredients_json, steps_json, image_key
      FROM imported_recipes WHERE slug = ? LIMIT 1`,
   ).bind(slug).first<ImportedRecipeRow>();
-  return row ? rowToRecipe(row) : undefined;
+  return row ? hydrateRecipe(rowToRecipe(row), (await readCatalog()).data) : undefined;
 }

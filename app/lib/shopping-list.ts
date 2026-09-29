@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { recipes, type Recipe } from "../data/recipes";
 import { listImportedRecipes } from "./imported-recipes";
+import { hydrateRecipe, readCatalog } from "./catalog";
 
 export type WeeklyList = {
   recipes: string[];
@@ -42,7 +43,8 @@ export function normalizeList(value: unknown, knownSlugs: Set<string>): WeeklyLi
 export async function allRecipes(): Promise<Recipe[]> {
   const saved = await listImportedRecipes();
   const overridden = new Set(saved.map((recipe) => recipe.slug));
-  return [...saved, ...recipes.filter((recipe) => !overridden.has(recipe.slug))];
+  const { data } = await readCatalog();
+  return [...saved, ...recipes.filter((recipe) => !overridden.has(recipe.slug)).map((recipe) => hydrateRecipe(recipe, data))];
 }
 
 export async function readWeek(week: string): Promise<{ list: WeeklyList; version: string }> {

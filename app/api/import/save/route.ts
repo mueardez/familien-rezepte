@@ -1,3 +1,4 @@
+import { prepareIngredients } from "../../../lib/catalog";
 import { env } from "cloudflare:workers";
 import { NextResponse } from "next/server";
 import { getUser } from "../../../auth";
@@ -25,6 +26,9 @@ export async function POST(request: Request) {
   let draft: RecipeDraft;
   try { draft = normalizeDraft(JSON.parse(rawRecipe)); }
   catch { return NextResponse.json({ error: "Bitte Titel und Zutaten vollständig ausfüllen." }, { status: 400 }); }
+
+  try { const linked = await prepareIngredients(draft.ingredients, draft.method); draft = { ...draft, ...linked }; }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Zutaten konnten nicht zugeordnet werden." }, { status: 400 }); }
 
   const id = crypto.randomUUID();
   const slug = await uniqueSlug(draft.title, id);

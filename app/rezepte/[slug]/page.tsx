@@ -1,3 +1,4 @@
+import { hydrateRecipe, readCatalog } from "../../lib/catalog";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
@@ -11,7 +12,7 @@ import { getUser } from "../../auth";
 
 export const dynamic = "force-dynamic";
 
-async function findRecipe(slug: string) { return await getImportedRecipe(slug) ?? getRecipe(slug); }
+async function findRecipe(slug: string) { const recipe = await getImportedRecipe(slug) ?? getRecipe(slug); return recipe ? hydrateRecipe(recipe, (await readCatalog()).data) : undefined; }
 
 export function generateStaticParams() { return recipes.map((recipe) => ({ slug: recipe.slug })); }
 
@@ -46,7 +47,7 @@ export default async function RecipePage({ params }: { params: Promise<{ slug: s
       <article itemScope itemType="https://schema.org/Recipe">
         <section className="recipe-hero"><div><p className="eyebrow">{recipe.time} · {recipe.method}</p><h1 itemProp="name">{recipe.title}</h1><p className="recipe-intro">Ein Rezept aus unserer Familienküche.</p><div className="facts"><span>⏱ {recipe.time}</span><span>🍽 {recipe.servings ?? "3 Portionen"}</span>{recipe.isInstagram && <span>Instagram-Rezept</span>}{!recipe.imageUrl && <span>🌾 Weizenfrei</span>}</div>{user && <p><Link className="secondary-action" href={`/rezepte/${encodeURIComponent(slug)}/bearbeiten`}>Rezept bearbeiten</Link></p>}</div>{recipe.imageUrl ? <div className="recipe-photo"><Image src={recipe.imageUrl} alt={`Fertiges Gericht: ${recipe.title}`} fill sizes="240px" priority unoptimized /></div> : <div className="recipe-icon" aria-hidden="true">{recipe.icon}</div>}</section>
         <section className="recipe-content">
-          <div className="ingredients"><p className="eyebrow">{recipe.servings ?? "Für 2 Erwachsene + 1 Kind"}</p><h2>Zutaten</h2><ul>{recipe.ingredients.map((ingredient, index) => <li itemProp="recipeIngredient" key={`${ingredient}-${index}`}>{ingredient}</li>)}</ul></div>
+          <div className="ingredients"><p className="eyebrow">{recipe.servings ?? "Für 2 Erwachsene + 1 Kind"}</p><h2>Zutaten</h2><ul>{recipe.ingredients.map((ingredient, index) => { const item = recipe.ingredientItems?.[index]; return <li itemProp="recipeIngredient" className="ingredient-display" key={`${ingredient}-${index}`}>{item ? <><strong>{[item.quantity, item.unit].filter(Boolean).join(" ")}</strong><span>{item.name}{item.note && <small> ({item.note})</small>}</span></> : ingredient}</li>; })}</ul></div>
           {recipe.steps.length > 0 && <div className="instructions"><p className="eyebrow">Schritt für Schritt</p><h2>So geht’s</h2><ol>{recipe.steps.map((step, index) => <li itemProp="recipeInstructions" key={`${index}-${step}`}><span>{index + 1}</span><p>{step}</p></li>)}</ol></div>}
         </section>
         {!recipe.imageUrl && <div className="kid-tip"><span aria-hidden="true">💡</span><div><strong>Kindertipp</strong><p>{recipe.tip}</p></div></div>}

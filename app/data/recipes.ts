@@ -1,12 +1,15 @@
 import { petromaxRecipes } from "./petromax-recipes";
 
+import type { Ingredient } from "../lib/ingredients";
+
 export type Recipe = {
   slug: string;
   title: string;
   time: string;
-  method: "Pfanne" | "Topf" | "Ofen" | "Waffeleisen" | "Petromax" | "Andere";
+  method: string;
   icon: string;
   ingredients: string[];
+  ingredientItems?: Ingredient[];
   steps: string[];
   tip: string;
   servings?: string;

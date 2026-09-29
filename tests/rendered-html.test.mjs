@@ -9,6 +9,20 @@ const config = {
 };
 globalThis.__testEnv = config;
 
+function memoryBucket(files = new Map()) {
+  const versions = new Map(); let revision = 0;
+  return {
+    async get(key) { return files.has(key) ? { etag: versions.get(key), text: async () => files.get(key) } : null; },
+    async put(key, body, options) {
+      if (options?.onlyIf instanceof Headers && files.has(key)) return null;
+      if (options?.onlyIf?.etagMatches && versions.get(key) !== options.onlyIf.etagMatches) return null;
+      const etag = String(++revision); files.set(key, body); versions.set(key, etag); return { etag };
+    },
+    async delete(key) { files.delete(key); versions.delete(key); },
+  };
+}
+
+
 test("renders the recipe collection and import entry point", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -99,7 +113,7 @@ test("renders the recipe collection and import entry point", async () => {
       const result = await fetchPage("/api/import/analyze", { method: "POST", body: form, headers: { origin: config.APP_ORIGIN, cookie: `__Host-familien-session=${token}` } });
       assert.equal(result.status, expected);
       const data = await result.json();
-      if (expected === 200) assert.deepEqual(data.recipe, ingredientsOnly);
+      if (expected === 200) { assert.equal(data.recipe.ingredients[1].name, "Ei"); assert.equal(data.recipe.ingredients[1].quantity, "3"); assert.deepEqual(data.recipe.steps, []); assert.equal(data.recipe.title, ""); }
       else assert.doesNotMatch(data.error, /schärfer/);
     }
   } finally {
@@ -109,8 +123,8 @@ test("renders the recipe collection and import entry point", async () => {
 
   // Optional preparation: persist an empty array, including omitted/blank steps.
   const savedRows = [];
-  config.DB = { prepare: () => ({ bind: (...values) => ({ first: async () => null, run: async () => { savedRows.push(values); } }) }) };
-  config.BUCKET = { put: async () => {}, delete: async () => {} };
+  config.DB = { prepare: () => ({ all: async () => ({ results: [] }), bind: (...values) => ({ first: async () => null, run: async () => { savedRows.push(values); } }) }) };
+  config.BUCKET = memoryBucket();
   try {
     for (const steps of [[], ["  "], undefined, ["Wrap füllen."]]) {
       const form = new FormData();
@@ -128,6 +142,8 @@ test("renders the recipe collection and import entry point", async () => {
       assert.equal(result.status, 400);
     }
     assert.equal(savedRows.length, 4);
+    const eggIds = savedRows.map((row) => JSON.parse(row[9])[1].foodId);
+    assert.ok(eggIds[0]); assert.equal(new Set(eggIds).size, 1);
   } finally {
     delete config.DB;
     delete config.BUCKET;
@@ -157,7 +173,7 @@ test("renders the recipe collection and import entry point", async () => {
       },
     };
   } };
-  config.BUCKET = { put: async (key, body) => { files.set(key, body); }, delete: async (key) => { files.delete(key); } };
+  config.BUCKET = memoryBucket(files);
   try {
     const slug = "kartoffel-zucchini-bauernpfanne";
     const cookie = `__Host-familien-session=${token}`;
@@ -191,14 +207,14 @@ test("renders the recipe collection and import entry point", async () => {
     replacement.set("dishImage", new File(["picture"], "dish.png", { type: "image/png" }));
     assert.equal((await requestEdit(`/api/recipes/${slug}`, replacement)).status, 200);
     assert.equal(rows.size, 1);
-    assert.equal(files.size, 1);
+    assert.equal([...files.keys()].filter((key) => key.startsWith("recipes/")).length, 1);
     assert.equal(rows.get(slug).steps_json, '["Im Ofen backen."]');
     const previousKey = rows.get(slug).image_key;
     const anotherPhoto = new FormData();
     anotherPhoto.set("recipe", JSON.stringify(draft));
     anotherPhoto.set("dishImage", new File(["new picture"], "new.png", { type: "image/png" }));
     assert.equal((await requestEdit(`/api/recipes/${slug}`, anotherPhoto)).status, 200);
-    assert.equal(files.size, 1);
+    assert.equal([...files.keys()].filter((key) => key.startsWith("recipes/")).length, 1);
     assert.equal(files.has(previousKey), false);
     assert.equal(files.has(rows.get(slug).image_key), true);
   } finally {
@@ -322,6 +338,7 @@ test("two voters resolve seven unique recipes into the existing weekly list", as
     assert.equal(view.status, 200);
     const { choices } = await view.json();
     assert.equal(choices.length, 10);
+    assert.ok(choices.every((item) => !item.slug.startsWith("petromax-")));
     const first = choices.slice(0, 7).map((item) => item.slug);
     const second = choices.slice(3, 10).map((item) => item.slug);
     const homePage = await request("/", { headers: { accept: "text/html" } });
@@ -346,4 +363,41 @@ test("two voters resolve seven unique recipes into the existing weekly list", as
     assert.ok(winners.every((item) => list.recipes.includes(item.slug)));
     assert.equal((await request("/api/polls", { method: "PUT", headers: h1, body: JSON.stringify({ selected: first }) })).status, 409);
   } finally { delete config.DB; delete config.BUCKET; delete config.POLL_VOTERS; delete config.POLL_DISPATCH_SECRET; }
+});
+
+test("catalog migration reuses foods and method CRUD preserves recipe references", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url); workerUrl.searchParams.set("catalog", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const files = new Map(); config.BUCKET = memoryBucket(files);
+  const legacy = { slug: "legacy-eggs", title: "Altes Rezept", method: "Ofen", ingredients_json: '["2 Eier","1 egg","40g geriebener Käse"]', steps_json: '[]', image_key: '', language: 'de', time: '20 Min.', instagram_recipe: 0, servings: '2' };
+  config.DB = { prepare: () => ({ all: async () => ({ results: [legacy] }), bind: () => ({ first: async () => legacy }) }) };
+  const token = await new SignJWT({ sub: "member", email: "member@example.com" }).setProtectedHeader({ alg: "HS256" }).setIssuer(config.APP_ORIGIN).setAudience("session").setIssuedAt().setExpirationTime("5m").sign(new TextEncoder().encode(config.SESSION_SECRET));
+  const headers = { origin: config.APP_ORIGIN, cookie: `__Host-familien-session=${token}`, "content-type": "application/json" };
+  const request = (path, options = {}) => worker.fetch(new Request(config.APP_ORIGIN + path, options), {}, { waitUntil() {}, passThroughOnException() {} });
+  const mutate = (body) => request("/api/catalog", { method: "POST", headers, body: JSON.stringify(body) });
+  try {
+    assert.equal((await request("/api/catalog")).status, 401);
+    assert.equal((await request("/api/catalog", { method: "POST", headers: { ...headers, origin: "https://evil.example" }, body: '{"action":"migrate"}' })).status, 403);
+    assert.equal((await mutate({ action: "migrate" })).status, 200);
+    const catalog = JSON.parse(files.get("catalog/v1.json"));
+    const items = catalog.migrated["legacy-eggs"];
+    assert.equal(items[0].foodId, items[1].foodId); assert.equal(items[0].quantity, "2"); assert.equal(items[1].quantity, "1");
+    assert.equal(catalog.foods.filter((food) => food.name === "Ei").length, 1);
+    assert.equal(catalog.methods.find((method) => method.name === "Petromax").inPoll, false);
+    assert.ok(files.has(catalog.backupKey));
+    const firstSnapshot = files.get("catalog/v1.json");
+    assert.equal((await mutate({ action: "migrate" })).status, 200);
+    assert.equal(files.get("catalog/v1.json"), firstSnapshot);
+    assert.equal((await mutate({ action: "method-create", name: "Dampfgarer", inPoll: false })).status, 200);
+    assert.equal((await mutate({ action: "method-create", name: "Dampfgarer", inPoll: true })).status, 400);
+    assert.equal((await mutate({ action: "method-update", id: "ofen", name: "Backofen", inPoll: false })).status, 200);
+    const detail = await request("/rezepte/legacy-eggs", { headers: { ...headers, accept: "text/html" } });
+    assert.match(await detail.text(), /Backofen/);
+    assert.equal((await mutate({ action: "method-delete", id: "ofen", replacementId: "topf" })).status, 200);
+    const detail2 = await request("/rezepte/legacy-eggs", { headers: { ...headers, accept: "text/html" } });
+    assert.match(await detail2.text(), /Topf/);
+    assert.equal(JSON.parse(files.get("catalog/v1.json")).methods.some((method) => method.id === "ofen"), false);
+    // The original DB strings remain an additional lossless migration fallback.
+    assert.equal(legacy.ingredients_json, '["2 Eier","1 egg","40g geriebener Käse"]');
+  } finally { delete config.DB; delete config.BUCKET; }
 });

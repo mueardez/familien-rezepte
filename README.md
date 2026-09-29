@@ -165,3 +165,13 @@ Einmalige Einrichtung:
 4. Zum Funktionstest `sendFridayPoll` einmal manuell ausführen. Derselbe Wochenlauf verschickt an jede Adresse nur einmal eine Einladung (markiert in den Skripteigenschaften). Den Link `/abstimmung` mit beiden Google-Konten öffnen und je sieben Rezepte wählen.
 
 Das Script benötigt ausschließlich die Google-Berechtigung zum E-Mail-Versand und zum Abruf der App. Der Schlüssel darf weder in GitHub noch in die Websiteoberfläche geschrieben werden. Für den Zeittrigger ist kein Cloudflare-Cron nötig. Ohne diese einmalige Einrichtung kann die Abstimmung in der App angezeigt, aber keine Freitags-E-Mail automatisch verschickt werden.
+
+### Verwaltung und Lebensmittelstamm
+
+`/admin` ist für dieselben angemeldeten Familienkonten wie der Rezepteditor zugänglich. Zubereitungsarten können erstellt, umbenannt, für neue Umfragen freigegeben und gelöscht werden. Beim Löschen ist eine Ersatzart erforderlich: bestehende Zuordnungen bleiben über historische Namen und IDs auflösbar. Petromax ist standardmässig für neue Umfragen deaktiviert; eine bereits gestartete Abstimmung wird nicht nachträglich verändert.
+
+Mengen, Einheiten, Lebensmittel und Hinweise sind getrennt. Neue und bearbeitete Rezepte speichern strukturierte Zutaten mit stabiler Lebensmittel-ID im vorhandenen D1-JSON-Feld. Gleichbedeutende bekannte Namen (z. B. Ei/Eier/eggs) und registrierte Aliase verwenden denselben Eintrag. Neue Lebensmittel werden bei Bedarf automatisch angelegt. Die Verwaltung kann Lebensmittel umbenennen oder zusammenführen; Weiterleitungen bewahren dabei bestehende Referenzen.
+
+Der erste angemeldete Aufruf von `/admin` (oder das nächste Speichern eines Rezepts) startet die idempotente Bestandsmigration. Sie sichert zuerst den vorherigen Katalog und die Zutatenangaben im privaten R2-Bucket unter `catalog/backups/`. Anschliessend werden Bestandsrezepte einschliesslich der eingebauten Rezepte in `catalog/v1.json` mit strukturierten Zutaten verknüpft. Alte D1-Zutatenstrings bleiben als zusätzliche verlustfreie Rückfallquelle erhalten. Neue Rezeptbearbeitungen haben Vorrang vor dem Migrationsstand. Es ist keine SQL-Migration erforderlich.
+
+Mehrdeutige Angaben und Alternativen werden mit Originaltext gespeichert und unter „Migration kontrollieren“ aufgelistet. Automatische Zuordnung ersetzt keine Kontrolle unklarer Mengen. Hinweise wie „weizenfrei“ werden nicht mit gewöhnlichen Lebensmitteln gleichgesetzt. Die Migration verwendet keine kostenpflichtige Bilderkennung.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { normalizeIngredient } from "../../../lib/ingredients";
 import { useRouter } from "next/navigation";
 import type { Recipe } from "../../../data/recipes";
 import { RecipeEditor, type Draft } from "../../../rezept-import/recipe-import-form";
@@ -11,14 +12,14 @@ export function RecipeEditForm({ slug, recipe }: { slug: string; recipe: Recipe 
     title: recipe.title, language: recipe.language ?? "de", time: recipe.time,
     servings: recipe.servings ?? "3 Portionen", method: recipe.method,
     isInstagram: recipe.isInstagram === true,
-    ingredients: recipe.ingredients, steps: recipe.steps,
+    ingredients: recipe.ingredientItems ?? recipe.ingredients.map(normalizeIngredient), steps: recipe.steps,
   });
   const [photo, setPhoto] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function save() {
-    if (!draft.title.trim() || !draft.ingredients.some((ingredient) => ingredient.trim())) {
+    if (!draft.title.trim() || !draft.ingredients.some((ingredient) => ingredient.name.trim())) {
       setError("Titel und Zutaten dürfen nicht leer sein."); return;
     }
     setError(""); setSaving(true);

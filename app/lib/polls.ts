@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { readCatalog, methodFor } from "./catalog";
 import type { Recipe } from "../data/recipes";
 import { allRecipes, currentWeek, listKey, readWeek, validWeek } from "./shopping-list";
 
@@ -37,8 +38,9 @@ export async function ensurePoll(week: string): Promise<Poll> {
   if (!validWeek(week)) throw new Error("Invalid week");
   const existing = await readPoll(week);
   if (existing.poll) return existing.poll;
-  const catalogue = await allRecipes();
-  if (catalogue.length < 10) throw new Error("Mindestens zehn Rezepte sind erforderlich.");
+  const { data: settings } = await readCatalog();
+  const catalogue = (await allRecipes()).filter((recipe) => methodFor(settings, recipe.method)?.inPoll === true);
+  if (catalogue.length < 10) throw new Error("Mindestens zehn für Umfragen freigegebene Rezepte sind erforderlich.");
   const date = new Date(`${week}T12:00:00Z`); date.setUTCDate(date.getUTCDate() - 7);
   const lastWeek = date.toISOString().slice(0, 10);
   const previous = (await readPoll(lastWeek)).poll?.choices ?? [];

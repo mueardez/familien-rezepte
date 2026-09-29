@@ -1,4 +1,5 @@
 import type { Recipe } from "../data/recipes";
+import { normalizeIngredient, type Ingredient } from "./ingredients";
 
 export type RecipeDraft = {
   title: string;
@@ -7,7 +8,7 @@ export type RecipeDraft = {
   servings: string;
   method: Recipe["method"];
   isInstagram: boolean;
-  ingredients: string[];
+  ingredients: Ingredient[];
   steps: string[];
 };
 
@@ -17,20 +18,18 @@ export function normalizeDraft(value: unknown): RecipeDraft {
   const title = typeof draft.title === "string" ? draft.title.trim() : "";
   const rawSteps = draft.steps ?? [];
   if (!Array.isArray(draft.ingredients) || !Array.isArray(rawSteps) ||
-      !draft.ingredients.every((item) => typeof item === "string") ||
       !rawSteps.every((item) => typeof item === "string")) throw new Error("Invalid lists");
-  const ingredients = draft.ingredients.map((item) => item.trim()).filter(Boolean);
+  const ingredients = draft.ingredients.map(normalizeIngredient).filter((item) => item.name);
   const steps = rawSteps.map((item) => item.trim()).filter(Boolean);
   if (!title || !ingredients.length) throw new Error("Incomplete draft");
-  const methods: RecipeDraft["method"][] = ["Pfanne", "Topf", "Ofen", "Waffeleisen", "Petromax", "Andere"];
   return {
     title: title.slice(0, 180),
     language: draft.language === "en" ? "en" : "de",
     time: String(draft.time || "30 Min.").trim().slice(0, 40),
     servings: String(draft.servings || "3 Portionen").trim().slice(0, 60),
-    method: methods.includes(draft.method as RecipeDraft["method"]) ? draft.method as RecipeDraft["method"] : "Andere",
+    method: typeof draft.method === "string" ? draft.method.slice(0, 80) : "Andere",
     isInstagram: draft.isInstagram === true,
-    ingredients: ingredients.slice(0, 80).map((item) => item.slice(0, 300)),
+    ingredients: ingredients.slice(0, 80),
     steps: steps.slice(0, 40).map((item) => item.slice(0, 1500)),
   };
 }
