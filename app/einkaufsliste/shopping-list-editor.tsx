@@ -9,8 +9,8 @@ const blank = (): WeeklyList => ({ recipes: [], extras: [], checked: [] });
 const shiftWeek = (week: string, count: number) => { const date = new Date(`${week}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + count * 7); return date.toISOString().slice(0, 10); };
 const initialWeek = () => { const date = new Date(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()) + "T12:00:00Z"); date.setUTCDate(date.getUTCDate() - (date.getUTCDay() + 6) % 7); return date.toISOString().slice(0, 10); };
 
-export function ShoppingListEditor({ catalogue }: { catalogue: RecipeOption[] }) {
-  const [week, setWeek] = useState(initialWeek);
+export function ShoppingListEditor({ catalogue, initialSelectedWeek }: { catalogue: RecipeOption[]; initialSelectedWeek?: string }) {
+  const [week, setWeek] = useState(() => initialSelectedWeek ?? initialWeek());
   const [list, setList] = useState<WeeklyList>(blank);
   const [version, setVersion] = useState("");
   const [loading, setLoading] = useState(true);
