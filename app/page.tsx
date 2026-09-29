@@ -5,7 +5,9 @@ import { listImportedRecipes } from "./lib/imported-recipes";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const allRecipes = [...await listImportedRecipes(), ...recipes];
+  const saved = await listImportedRecipes();
+  const overridden = new Set(saved.map((recipe) => recipe.slug));
+  const allRecipes = [...saved, ...recipes.filter((recipe) => !overridden.has(recipe.slug))];
   return (
     <main>
       <header className="site-header"><a className="brand" href="#top"><span aria-hidden="true">🥕</span> Familien-Rezepte</a><div className="header-actions"><span className="header-note">2 Erwachsene + 1 Kind</span><a className="add-recipe-link" href="/rezept-import">＋ Rezept hinzufügen</a></div></header>

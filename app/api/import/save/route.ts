@@ -2,19 +2,9 @@ import { env } from "cloudflare:workers";
 import { NextResponse } from "next/server";
 import { getUser } from "../../../auth";
 import { sameOriginMutation } from "../../../lib/auth-core";
+import { normalizeDraft, type RecipeDraft } from "../../../lib/recipe-draft";
 
 export const dynamic = "force-dynamic";
-
-type Draft = {
-  title: string;
-  language: "de" | "en";
-  time: string;
-  servings: string;
-  method: "Pfanne" | "Topf" | "Ofen" | "Waffeleisen" | "Andere";
-  isInstagram: boolean;
-  ingredients: string[];
-  steps: string[];
-};
 
 export async function POST(request: Request) {
   if (!sameOriginMutation(request, env)) return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 403 });
@@ -32,7 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Bitte ein Gerichtsfoto bis 8 MB verwenden." }, { status: 400 });
   }
 
-  let draft: Draft;
+  let draft: RecipeDraft;
   try { draft = normalizeDraft(JSON.parse(rawRecipe)); }
   catch { return NextResponse.json({ error: "Bitte Titel und Zutaten vollständig ausfüllen." }, { status: 400 }); }
 
@@ -56,23 +46,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Das Rezept konnte nicht gespeichert werden." }, { status: 500 });
   }
   return NextResponse.json({ slug, url: `/rezepte/${slug}` });
-}
-
-function normalizeDraft(value: Partial<Draft>): Draft {
-  const title = String(value.title ?? "").trim();
-  const ingredients = (value.ingredients ?? []).map(String).map((item) => item.trim()).filter(Boolean);
-  const steps = (value.steps ?? []).map(String).map((item) => item.trim()).filter(Boolean);
-  if (!title || !ingredients.length) throw new Error("Incomplete draft");
-  return {
-    title: title.slice(0, 180),
-    language: value.language === "en" ? "en" : "de",
-    time: String(value.time || "30 Min.").trim().slice(0, 40),
-    servings: String(value.servings || "3 Portionen").trim().slice(0, 60),
-    method: ["Pfanne", "Topf", "Ofen", "Waffeleisen", "Andere"].includes(String(value.method)) ? value.method as Draft["method"] : "Andere",
-    isInstagram: value.isInstagram !== false,
-    ingredients: ingredients.slice(0, 80).map((item) => item.slice(0, 300)),
-    steps: steps.slice(0, 40).map((item) => item.slice(0, 1500)),
-  };
 }
 
 async function uniqueSlug(title: string, id: string): Promise<string> {

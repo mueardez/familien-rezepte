@@ -13,6 +13,10 @@ Kein ChatGPT-Login, keine Übernahme ungeprüfter Identitäts-Header.
   Instagram-Kennzeichen und kombinierbare Filter sind enthalten.
 - Google-Anmeldung mit serverseitiger Prüfung; nur freigegebene Konten.
 - Alle freigegebenen Nutzer haben dieselben Rechte und dürfen Rezepte importieren/speichern.
+- Auf der Detailseite können freigegebene Nutzer alle Rezepte bearbeiten. Änderungen an
+  den mitgelieferten Rezepten liegen als Datenbankfassung mit derselben URL vor.
+  Titel, Zutaten, Zubereitung (optional), Zeit, Portionen, Kategorie,
+  Instagram-Markierung und Gerichtsfoto lassen sich anpassen.
 - Google verlangt nur `openid email`, keinen Gmail-Zugriff.
 - Noch nicht enthalten: Einkaufslisten-Erweiterung aus dem zurückgenommenen Stand,
   Umfragen, E-Mail-Versand, automatische Freitags-Aufgaben.

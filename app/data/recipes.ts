@@ -12,6 +12,7 @@ export type Recipe = {
   servings?: string;
   imageUrl?: string;
   isInstagram?: boolean;
+  language?: "de" | "en";
 };
 
 const baseRecipes: Recipe[] = [

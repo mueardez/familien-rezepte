@@ -133,6 +133,79 @@ test("renders the recipe collection and import entry point", async () => {
     delete config.BUCKET;
   }
 
+  const rows = new Map();
+  const files = new Map();
+  config.DB = { prepare(sql) {
+    return {
+      async all() { return { results: [...rows.values()] }; },
+      bind(...values) {
+        return {
+          async first() {
+            return rows.get(values[0]) ?? null;
+          },
+          async all() { return { results: [...rows.values()] }; },
+          async run() {
+            if (sql.startsWith("INSERT")) {
+              const [id, slug, owner_email, title, language, time, method, instagram_recipe, servings, ingredients_json, steps_json, image_key] = values;
+              rows.set(slug, { id, slug, owner_email, title, language, time, method, instagram_recipe, servings, ingredients_json, steps_json, image_key });
+            } else if (sql.startsWith("UPDATE")) {
+              const [title, language, time, method, instagram_recipe, servings, ingredients_json, steps_json, image_key, slug] = values;
+              Object.assign(rows.get(slug), { title, language, time, method, instagram_recipe, servings, ingredients_json, steps_json, image_key });
+            }
+          },
+        };
+      },
+    };
+  } };
+  config.BUCKET = { put: async (key, body) => { files.set(key, body); }, delete: async (key) => { files.delete(key); } };
+  try {
+    const slug = "kartoffel-zucchini-bauernpfanne";
+    const cookie = `__Host-familien-session=${token}`;
+    const editPage = await fetchPage(`/rezepte/${slug}/bearbeiten`, { headers: { cookie, accept: "text/html" } });
+    assert.equal(editPage.status, 200);
+    assert.match(await editPage.text(), /bearbeiten/);
+    const draft = { title: "Bauernpfanne angepasst", language: "en", time: "35 Min.", method: "Ofen", servings: "4 Portionen", isInstagram: true, ingredients: ["2 Kartoffeln"], steps: [] };
+    const requestEdit = (path, data, headers = {}) => fetchPage(path, { method: "PATCH", body: data, headers: { origin: config.APP_ORIGIN, cookie, ...headers } });
+    const form = new FormData(); form.set("recipe", JSON.stringify(draft));
+    assert.equal((await requestEdit(`/api/recipes/${slug}`, form, { origin: "https://evil.com" })).status, 403);
+    assert.equal((await requestEdit("/api/recipes/does-not-exist", form)).status, 404);
+    const outsider = await new SignJWT({ sub: "outsider", email: "outsider@example.com" }).setProtectedHeader({ alg: "HS256" })
+      .setIssuer(config.APP_ORIGIN).setAudience("session").setIssuedAt().setExpirationTime("5m")
+      .sign(new TextEncoder().encode(config.SESSION_SECRET));
+    assert.equal((await fetchPage(`/api/recipes/${slug}`, { method: "PATCH", body: form, headers: { origin: config.APP_ORIGIN, cookie: `__Host-familien-session=${outsider}` } })).status, 401);
+    assert.equal((await requestEdit(`/api/recipes/${slug}`, form)).status, 200);
+    assert.equal(rows.size, 1);
+    assert.equal(rows.get(slug).image_key, "");
+    assert.equal(rows.get(slug).language, "en");
+    const home = await fetchPage("/", { headers: { accept: "text/html" } });
+    const homeText = await home.text();
+    assert.match(homeText, /Bauernpfanne angepasst/);
+    assert.equal((homeText.match(/href="\/rezepte\/kartoffel-zucchini-bauernpfanne"/g) ?? []).length, 1);
+    const detail = await fetchPage(`/rezepte/${slug}`, { headers: { cookie, accept: "text/html" } });
+    const detailText = await detail.text();
+    assert.match(detailText, /Bauernpfanne angepasst/);
+    assert.match(detailText, /Rezept bearbeiten/);
+    assert.doesNotMatch(detailText, /<h2>So geht’s<\/h2>/);
+    const replacement = new FormData();
+    replacement.set("recipe", JSON.stringify({ ...draft, title: "Nochmals angepasst", steps: ["Im Ofen backen."] }));
+    replacement.set("dishImage", new File(["picture"], "dish.png", { type: "image/png" }));
+    assert.equal((await requestEdit(`/api/recipes/${slug}`, replacement)).status, 200);
+    assert.equal(rows.size, 1);
+    assert.equal(files.size, 1);
+    assert.equal(rows.get(slug).steps_json, '["Im Ofen backen."]');
+    const previousKey = rows.get(slug).image_key;
+    const anotherPhoto = new FormData();
+    anotherPhoto.set("recipe", JSON.stringify(draft));
+    anotherPhoto.set("dishImage", new File(["new picture"], "new.png", { type: "image/png" }));
+    assert.equal((await requestEdit(`/api/recipes/${slug}`, anotherPhoto)).status, 200);
+    assert.equal(files.size, 1);
+    assert.equal(files.has(previousKey), false);
+    assert.equal(files.has(rows.get(slug).image_key), true);
+  } finally {
+    delete config.DB;
+    delete config.BUCKET;
+  }
+
   const login = await fetchPage("/auth/google?return_to=%2Frezept-import");
   assert.equal(login.status, 302);
   const google = new URL(login.headers.get("location"));

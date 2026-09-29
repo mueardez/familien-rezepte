@@ -7,7 +7,7 @@ export default {
     const headers = new Headers(response.headers);
     headers.set("X-Content-Type-Options", "nosniff");
     const path = new URL(request.url).pathname;
-    if (path.startsWith("/auth/") || path === "/anmelden" || path === "/rezept-import" || path.startsWith("/api/import/")) {
+    if (path.startsWith("/auth/") || path === "/anmelden" || path === "/rezept-import" || path.endsWith("/bearbeiten") || path.startsWith("/api/import/") || path.startsWith("/api/recipes/")) {
       headers.set("Cache-Control", "private, no-store");
       headers.set("Referrer-Policy", "no-referrer");
     }

@@ -7,10 +7,11 @@ import { getRecipe, recipes } from "../../data/recipes";
 import { getImportedRecipe } from "../../lib/imported-recipes";
 import { env } from "cloudflare:workers";
 import { appOrigin } from "../../lib/auth-core";
+import { getUser } from "../../auth";
 
 export const dynamic = "force-dynamic";
 
-async function findRecipe(slug: string) { return getRecipe(slug) ?? await getImportedRecipe(slug); }
+async function findRecipe(slug: string) { return await getImportedRecipe(slug) ?? getRecipe(slug); }
 
 export function generateStaticParams() { return recipes.map((recipe) => ({ slug: recipe.slug })); }
 
@@ -26,6 +27,7 @@ export default async function RecipePage({ params }: { params: Promise<{ slug: s
   const { slug } = await params;
   const recipe = await findRecipe(slug);
   if (!recipe) notFound();
+  const user = await getUser();
   const minutes = recipe.time.match(/\d+/)?.[0] ?? "20";
   const structuredRecipe = {
     "@context": "https://schema.org", "@type": "Recipe", name: recipe.title,
@@ -42,10 +44,10 @@ export default async function RecipePage({ params }: { params: Promise<{ slug: s
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredRecipe).replace(/</g, "\\u003c") }} />
       <header className="site-header compact"><Link className="brand" href="/"><span aria-hidden="true">🥕</span> Familien-Rezepte</Link><Link className="back-link" href="/">← Alle Rezepte</Link></header>
       <article itemScope itemType="https://schema.org/Recipe">
-        <section className="recipe-hero"><div><p className="eyebrow">{recipe.time} · {recipe.method}</p><h1 itemProp="name">{recipe.title}</h1><p className="recipe-intro">Ein Rezept aus unserer Familienküche.</p><div className="facts"><span>⏱ {recipe.time}</span><span>🍽 {recipe.servings ?? "3 Portionen"}</span>{recipe.isInstagram && <span>Instagram-Rezept</span>}{!recipe.imageUrl && <span>🌾 Weizenfrei</span>}</div></div>{recipe.imageUrl ? <div className="recipe-photo"><Image src={recipe.imageUrl} alt={`Fertiges Gericht: ${recipe.title}`} fill sizes="240px" priority unoptimized /></div> : <div className="recipe-icon" aria-hidden="true">{recipe.icon}</div>}</section>
+        <section className="recipe-hero"><div><p className="eyebrow">{recipe.time} · {recipe.method}</p><h1 itemProp="name">{recipe.title}</h1><p className="recipe-intro">Ein Rezept aus unserer Familienküche.</p><div className="facts"><span>⏱ {recipe.time}</span><span>🍽 {recipe.servings ?? "3 Portionen"}</span>{recipe.isInstagram && <span>Instagram-Rezept</span>}{!recipe.imageUrl && <span>🌾 Weizenfrei</span>}</div>{user && <p><Link className="secondary-action" href={`/rezepte/${encodeURIComponent(slug)}/bearbeiten`}>Rezept bearbeiten</Link></p>}</div>{recipe.imageUrl ? <div className="recipe-photo"><Image src={recipe.imageUrl} alt={`Fertiges Gericht: ${recipe.title}`} fill sizes="240px" priority unoptimized /></div> : <div className="recipe-icon" aria-hidden="true">{recipe.icon}</div>}</section>
         <section className="recipe-content">
           <div className="ingredients"><p className="eyebrow">{recipe.servings ?? "Für 2 Erwachsene + 1 Kind"}</p><h2>Zutaten</h2><ul>{recipe.ingredients.map((ingredient, index) => <li itemProp="recipeIngredient" key={`${ingredient}-${index}`}>{ingredient}</li>)}</ul></div>
-          <div className="instructions"><p className="eyebrow">Schritt für Schritt</p><h2>So geht’s</h2><ol>{recipe.steps.map((step, index) => <li itemProp="recipeInstructions" key={step}><span>{index + 1}</span><p>{step}</p></li>)}</ol></div>
+          {recipe.steps.length > 0 && <div className="instructions"><p className="eyebrow">Schritt für Schritt</p><h2>So geht’s</h2><ol>{recipe.steps.map((step, index) => <li itemProp="recipeInstructions" key={`${index}-${step}`}><span>{index + 1}</span><p>{step}</p></li>)}</ol></div>}
         </section>
         {!recipe.imageUrl && <div className="kid-tip"><span aria-hidden="true">💡</span><div><strong>Kindertipp</strong><p>{recipe.tip}</p></div></div>}
         <BringImport />

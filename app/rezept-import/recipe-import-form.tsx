@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Draft = {
+export type Draft = {
   title: string;
   language: "de" | "en";
   time: string;
   servings: string;
-  method: "Pfanne" | "Topf" | "Ofen" | "Waffeleisen" | "Andere";
+  method: "Pfanne" | "Topf" | "Ofen" | "Waffeleisen" | "Petromax" | "Andere";
   isInstagram: boolean;
   ingredients: string[];
   steps: string[];
@@ -93,24 +93,25 @@ function ImagePicker({ number, title, hint, file, onChange }: { number: string; 
   );
 }
 
-function RecipeEditor({ draft, setDraft, error, status, onBack, onSave }: { draft: Draft; setDraft: (draft: Draft) => void; error: string; status: string; onBack: () => void; onSave: () => void }) {
+export function RecipeEditor({ draft, setDraft, error, status, onBack, onSave, editing = false, photoControl }: { draft: Draft; setDraft: (draft: Draft) => void; error: string; status: string; onBack: () => void; onSave: () => void; editing?: boolean; photoControl?: React.ReactNode }) {
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft({ ...draft, [key]: value });
   const missing = [!draft.title.trim() && "Titel", !draft.ingredients.some((item) => item.trim()) && "Zutaten"].filter(Boolean);
   return (
     <div className="recipe-editor">
-      <div className="editor-banner"><span>✓</span><div><strong>{missing.length ? "Rezept teilweise erkannt" : "Rezept erkannt"}</strong><p>{missing.length ? `Noch ergänzen: ${missing.join(", ")}. Diese Angaben wurden nicht erkannt. Die übrigen Angaben wurden übernommen.` : "Bitte Mengen und Schritte kurz kontrollieren."}</p></div></div>
+      <div className="editor-banner"><span>✓</span><div><strong>{editing ? "Rezept bearbeiten" : missing.length ? "Rezept teilweise erkannt" : "Rezept erkannt"}</strong><p>{missing.length ? `Noch ergänzen: ${missing.join(", ")}.` : "Bitte Angaben kontrollieren und speichern."}</p></div></div>
       {!draft.steps.some((item) => item.trim()) && <p className="privacy-note">Zubereitung ist optional. Du kannst das Rezept auch ohne Schritte speichern.</p>}
       <div className="editor-fields">
         <label className="field wide"><span>Titel</span><input value={draft.title} onChange={(event) => set("title", event.target.value)} /></label>
         <label className="field"><span>Zeit</span><input value={draft.time} onChange={(event) => set("time", event.target.value)} /></label>
         <label className="field"><span>Portionen</span><input value={draft.servings} onChange={(event) => set("servings", event.target.value)} /></label>
-        <label className="field"><span>Zubereitungsart</span><select value={draft.method} onChange={(event) => set("method", event.target.value as Draft["method"])}>{["Pfanne", "Topf", "Ofen", "Waffeleisen", "Andere"].map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className="field"><span>Zubereitungsart</span><select value={draft.method} onChange={(event) => set("method", event.target.value as Draft["method"])}>{["Pfanne", "Topf", "Ofen", "Waffeleisen", "Petromax", "Andere"].map((item) => <option key={item}>{item}</option>)}</select></label>
+        {photoControl}
         <label className="flag-choice editor-flag wide"><input type="checkbox" checked={draft.isInstagram} onChange={(event) => set("isInstagram", event.target.checked)} /><span><strong>Instagram-Rezept</strong><small>In der Rezeptsuche als eigene Kategorie auffindbar</small></span></label>
         <div className="field wide"><span>Zutaten</span><div className="editable-list">{draft.ingredients.map((item, index) => <div className="editable-row" key={index}><input aria-label={`Zutat ${index + 1}`} value={item} onChange={(event) => set("ingredients", replaceAt(draft.ingredients, index, event.target.value))} /><button type="button" aria-label={`Zutat ${index + 1} entfernen`} onClick={() => set("ingredients", removeAt(draft.ingredients, index))}>×</button></div>)}</div><button className="add-row" type="button" onClick={() => set("ingredients", [...draft.ingredients, ""])}>+ Zutat</button></div>
         <div className="field wide"><span>Zubereitung</span><div className="editable-list steps-edit">{draft.steps.map((item, index) => <div className="editable-row" key={index}><b>{index + 1}</b><textarea aria-label={`Schritt ${index + 1}`} value={item} onChange={(event) => set("steps", replaceAt(draft.steps, index, event.target.value))} /><button type="button" aria-label={`Schritt ${index + 1} entfernen`} onClick={() => set("steps", removeAt(draft.steps, index))}>×</button></div>)}</div><button className="add-row" type="button" onClick={() => set("steps", [...draft.steps, ""])}>+ Schritt</button></div>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="editor-actions"><button className="secondary-action" type="button" onClick={onBack}>Zurück zu den Bildern</button><button className="import-action" type="button" disabled={status === "saving"} onClick={onSave}>{status === "saving" ? "Rezept wird gespeichert …" : "Rezept speichern"}</button></div>
+      <div className="editor-actions"><button className="secondary-action" type="button" onClick={onBack}>{editing ? "Abbrechen" : "Zurück zu den Bildern"}</button><button className="import-action" type="button" disabled={status === "saving"} onClick={onSave}>{status === "saving" ? "Rezept wird gespeichert …" : "Rezept speichern"}</button></div>
     </div>
   );
 }
