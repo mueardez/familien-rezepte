@@ -18,7 +18,11 @@ export async function GET(request: Request) {
   if (!poll) return fail("Die Abstimmung wird zum eingestellten Versandtermin eröffnet.", 404);
   if (poll.winners.length === 7) await syncWinners(poll);
   const catalogue = await allRecipes();
-  return NextResponse.json({ week, choices: poll.choices.map((slug) => ({ slug, title: catalogue.find((item) => item.slug === slug)?.title ?? slug })), selected: poll.votes[user.email] ?? [], voted: Object.keys(poll.votes).length, complete: poll.winners.length === 7, winners: poll.winners.map((slug) => ({ slug, title: catalogue.find((item) => item.slug === slug)?.title ?? slug })) }, { headers: { "cache-control": "private, no-store" } });
+  const choice = (slug: string) => {
+    const recipe = catalogue.find((item) => item.slug === slug);
+    return { slug, title: recipe?.title ?? slug, imageUrl: recipe?.imageUrl ?? null, icon: recipe?.icon ?? "🍽" };
+  };
+  return NextResponse.json({ week, choices: poll.choices.map(choice), selected: poll.votes[user.email] ?? [], voted: Object.keys(poll.votes).length, complete: poll.winners.length === 7, winners: poll.winners.map(choice) }, { headers: { "cache-control": "private, no-store" } });
 }
 export async function PUT(request: Request) {
   if (!sameOriginMutation(request, env)) return fail("Ungültige Anfrage.", 403);

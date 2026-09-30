@@ -29,6 +29,7 @@ function sendPoll_(scheduled) {
       MailApp.sendEmail({
         to: recipient, subject: 'Was kochen wir nächste Woche? – Familien-Rezepte',
         body: 'Wähle sieben von zehn Rezepten für die Woche ab ' + poll.week + '.\n\nZur Abstimmung: ' + poll.url + '\n\nBitte melde dich mit deinem Google-Konto an.',
+        ...(poll.htmlBody ? { htmlBody: poll.htmlBody } : {}),
         name: 'Familien-Rezepte',
       });
       properties.setProperty(sentKey, new Date().toISOString());

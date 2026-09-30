@@ -338,6 +338,7 @@ test("two voters resolve seven unique recipes into the existing weekly list", as
     assert.equal(view.status, 200);
     const { choices } = await view.json();
     assert.equal(choices.length, 10);
+    assert.ok(choices.every((item) => typeof item.icon === "string" && "imageUrl" in item));
     assert.ok(choices.every((item) => !item.slug.startsWith("petromax-")));
     const first = choices.slice(0, 7).map((item) => item.slug);
     const second = choices.slice(3, 10).map((item) => item.slug);
