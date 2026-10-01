@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { requireUser } from "../auth";
 import { RecipeImportForm } from "./recipe-import-form";
+import { SiteHeader } from "../components/site-header";
 
 export const dynamic = "force-dynamic";
 
@@ -8,10 +8,7 @@ export default async function RecipeImportPage() {
   await requireUser("/rezept-import");
   return (
     <main className="import-page">
-      <header className="site-header compact">
-        <Link className="brand" href="/"><span aria-hidden="true">🥕</span> Familien-Rezepte</Link>
-        <Link className="back-link" href="/">← Alle Rezepte</Link>
-      </header>
+      <SiteHeader compact backHref="/" backLabel="Alle Rezepte" />
       <section className="import-shell">
         <div className="import-heading">
           <p className="eyebrow">Neues Rezept</p>

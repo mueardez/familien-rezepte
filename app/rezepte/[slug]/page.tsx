@@ -9,6 +9,7 @@ import { getImportedRecipe } from "../../lib/imported-recipes";
 import { env } from "cloudflare:workers";
 import { appOrigin } from "../../lib/auth-core";
 import { getUser } from "../../auth";
+import { SiteHeader } from "../../components/site-header";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export default async function RecipePage({ params }: { params: Promise<{ slug: s
   return (
     <main className="recipe-page">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredRecipe).replace(/</g, "\\u003c") }} />
-      <header className="site-header compact"><Link className="brand" href="/"><span aria-hidden="true">🥕</span> Familien-Rezepte</Link><Link className="back-link" href="/">← Alle Rezepte</Link></header>
+      <SiteHeader compact backHref="/" backLabel="Alle Rezepte" />
       <article itemScope itemType="https://schema.org/Recipe">
         <section className="recipe-hero"><div><p className="eyebrow">{recipe.time} · {recipe.method}</p><h1 itemProp="name">{recipe.title}</h1><p className="recipe-intro">Ein Rezept aus unserer Familienküche.</p><div className="facts"><span>⏱ {recipe.time}</span><span>🍽 {recipe.servings ?? "3 Portionen"}</span>{recipe.isInstagram && <span>Instagram-Rezept</span>}{!recipe.imageUrl && <span>🌾 Weizenfrei</span>}</div>{user && <p><Link className="secondary-action" href={`/rezepte/${encodeURIComponent(slug)}/bearbeiten`}>Rezept bearbeiten</Link></p>}</div>{recipe.imageUrl ? <div className="recipe-photo"><Image src={recipe.imageUrl} alt={`Fertiges Gericht: ${recipe.title}`} fill sizes="240px" priority unoptimized /></div> : <div className="recipe-icon" aria-hidden="true">{recipe.icon}</div>}</section>
         <section className="recipe-content">
