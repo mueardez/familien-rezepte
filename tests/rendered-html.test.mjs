@@ -104,8 +104,15 @@ test("renders the recipe collection and import entry point", async () => {
   const ingredientsOnly = { title: "", language: "de", time: "", servings: "", method: "Andere", ingredients: ["1 Wrap", "3 Eier", "40 g geriebener Käse"], steps: [] };
   try {
     for (const [output, expected] of [[JSON.stringify(ingredientsOnly), 200], [JSON.stringify({ ...ingredientsOnly, ingredients: [] }), 422], ["invalid json", 422]]) {
-      globalThis.fetch = async (url) => {
+      globalThis.fetch = async (url, options) => {
         assert.equal(url, "https://api.openai.com/v1/responses");
+        const requestBody = JSON.parse(options.body);
+        assert.deepEqual(requestBody.text.format.schema.properties.language.enum, ["de"]);
+        const instruction = requestBody.input[0].content[0].text;
+        assert.match(instruction, /Übersetze englische Texte vollständig ins Deutsche/);
+        assert.match(instruction, /metrische Werte bereits im Bild/);
+        assert.match(instruction, /zutatspezifischer Dichte/);
+        assert.doesNotMatch(instruction, /Bewahre die Originalsprache/);
         return Response.json({ output: [{ content: [{ type: "output_text", text: output }] }] });
       };
       const form = new FormData();
