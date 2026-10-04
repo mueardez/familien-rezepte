@@ -69,6 +69,7 @@ export function RecipeImportForm() {
         <button className="import-action" type="button" disabled={status !== "idle" || !textImage || !dishImage} onClick={analyze}>
           {status === "reading" ? "Rezept wird erkannt …" : "Bilder auslesen"}
         </button>
+        <p className="privacy-note">Englische Rezepte werden ins Deutsche übersetzt und Masseinheiten umgerechnet. Bitte prüfe die erkannten Angaben vor dem Speichern.</p>
         <p className="privacy-note">Das Rezepttext-Bild wird nur für die Erkennung verwendet. Gespeichert wird das Gerichtsfoto.</p>
       </> : <RecipeEditor draft={draft} setDraft={setDraft} error={error} status={status} onBack={() => { setDraft(null); setError(""); }} onSave={save} />}
     </div>
